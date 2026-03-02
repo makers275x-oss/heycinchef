@@ -1,0 +1,32 @@
+"use client";
+
+import React from "react";
+import GenieChefAnim from "@/components/GenieChefAnim";
+
+type Mood = "happy" | "thinking" | "excited" | "warning";
+
+export default function ChefBubble({
+  name = "Cin Şef Cino",
+  mood = "thinking",
+  text,
+}: {
+  name?: string;
+  mood?: Mood;
+  text: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <GenieChefAnim mood={mood} />
+
+      <div className="flex items-start gap-3 rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gray-100 text-xl">
+          🪔
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold">{name}</div>
+          <div className="mt-1 text-sm text-gray-700">{text}</div>
+        </div>
+      </div>
+    </div>
+  );
+}

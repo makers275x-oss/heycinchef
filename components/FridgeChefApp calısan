@@ -1,0 +1,1088 @@
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import RecipeCard, { Recipe } from "@/components/RecipeCard";
+
+type Mode = "home" | "assistant" | "tarif" | "kokteyl" | "kombin";
+
+// Tarif
+type StageTarif = "upload" | "select" | "scanning" | "result" | "cook";
+type MealType = "Yemek" | "Salata";
+
+// Kokteyl
+type StageCocktail = "upload" | "select" | "mixing" | "result";
+type AlcoholLevel = "hafif" | "orta" | "sert";
+
+type Cocktail = {
+  title: string;
+  why: string;
+  steps: string[];
+  glass?: string;
+  garnish?: string;
+  ice?: "none" | "cubes" | "crushed";
+  alcoholLevel?: AlcoholLevel;
+};
+
+// Kombin (Quick only)
+type Weather = "soğuk" | "ılık" | "sıcak";
+type Place = "günlük" | "iş" | "date" | "parti";
+type Style = "sade" | "cool" | "şık" | "komik";
+
+type KombinOption = {
+  title: string;
+  why: string;
+  items: string[];
+  colorTip?: string;
+};
+
+function pick(arr: string[]) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// --- Emoji temizleme (ses emojileri okumasın) ---
+function stripEmojis(text: string) {
+  return (text || "")
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+// --- Speech Queue (emoji temizliyor, kesmiyor) ---
+let speaking = false;
+const speechQueue: { text: string; rate: number }[] = [];
+
+function flushSpeechQueue() {
+  if (typeof window === "undefined") return;
+  if (speaking) return;
+  const next = speechQueue.shift();
+  if (!next) return;
+
+  try {
+    const synth = window.speechSynthesis;
+    const u = new SpeechSynthesisUtterance(next.text);
+    u.lang = "tr-TR";
+    u.rate = next.rate;
+
+    speaking = true;
+    u.onend = () => {
+      speaking = false;
+      flushSpeechQueue();
+    };
+    u.onerror = () => {
+      speaking = false;
+      flushSpeechQueue();
+    };
+
+    synth.speak(u);
+  } catch {
+    speaking = false;
+  }
+}
+
+function sayTR(text: string, rate = 0.92) {
+  if (typeof window === "undefined") return;
+  const clean = stripEmojis(text);
+  if (!clean) return;
+  speechQueue.push({ text: clean, rate });
+  flushSpeechQueue();
+}
+
+function stopSpeech() {
+  if (typeof window === "undefined") return;
+  try {
+    window.speechSynthesis.cancel();
+  } catch {}
+  speaking = false;
+  speechQueue.splice(0, speechQueue.length);
+}
+
+const FUN = {
+  home: [
+    "Lamba hazır… Cin Asistan burada 😄",
+    "Bugün ne yapıyoruz? Ben hazırım!",
+    "Şak modu açık. Seç, başlayalım 😎",
+  ],
+  scanFood: [
+    "Dolabı tarıyorum… saklananlar yakalanacak 😄",
+    "Buz krallığına girdim… malzeme avı başladı 🧊",
+    "Cin gözleri çalışıyor… net görünenleri yazıyorum 😎",
+  ],
+  foundFood: [
+    "Şak! Net gördüklerim bunlar 😄",
+    "Tamamdır. Seç bakalım!",
+    "Bunlarla güzel şeyler çıkar 😎",
+  ],
+  cooking: ["Tarifi pişiriyorum 😄", "Mutfak büyüsü başladı 🔥", "Şak şak… tarif geliyor!"],
+  readyFood: [
+    "Tarif hazır 😄",
+    "Şak! Tarif çıktı. Afiyet olsun 😎",
+    "Tamamdır, yazdım! Şimdi sahne senin.",
+  ],
+
+  scanDrinks: ["Şişeleri tarıyorum 😄", "Barmen cin devrede 🍸", "Etiketleri yakalıyorum 😎"],
+  foundDrinks: ["Şak! İçerikler geldi 😄", "Tamamdır. Seçelim!", "Bunlarla karışım çıkar 😎"],
+  mixing: ["Karıştırıyorum 🍸", "Buzlar dans ediyor 🧊", "Şakır şakır…"],
+  readyDrink: ["Kokteyl hazır 😄", "Şak! Karışım tamam 😎", "Bardak hazır mı?"],
+};
+
+export default function FridgeChefApp() {
+  const fileTarifRef = useRef<HTMLInputElement | null>(null);
+  const fileCocktailRef = useRef<HTMLInputElement | null>(null);
+
+  const [mode, setMode] = useState<Mode>("home");
+
+  const subtitle = useMemo(() => {
+    if (mode === "home") return "Ana Menü";
+    if (mode === "assistant") return "Cin Asistan";
+    if (mode === "tarif") return "Tarif";
+    if (mode === "kokteyl") return "Kokteyl";
+    return "Bugün Ne Giysem";
+  }, [mode]);
+
+  // HOME line
+  const [homeLine, setHomeLine] = useState<string>(pick(FUN.home));
+  useEffect(() => {
+    if (mode === "home") {
+      const l = pick(FUN.home);
+      setHomeLine(l);
+      sayTR(l);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  // ==========================
+  // TARİF STATE
+  // ==========================
+  const [stageTarif, setStageTarif] = useState<StageTarif>("upload");
+  const [mealType, setMealType] = useState<MealType>("Yemek");
+  const [timeLimit, setTimeLimit] = useState<number>(25);
+  const [diet, setDiet] = useState<string>("Serbest");
+
+  const [chefTextTarif, setChefTextTarif] = useState<string>(
+    "Fotoğraf yükle; dolaptaki ürünleri çıkarıp seçtireceğim 😄"
+  );
+  const [previewTarif, setPreviewTarif] = useState<string | null>(null);
+  const [ingredientsTarif, setIngredientsTarif] = useState<string[]>([]);
+  const [selectedTarif, setSelectedTarif] = useState<Record<string, boolean>>({});
+  const [bestRecipe, setBestRecipe] = useState<Recipe | null>(null);
+
+  const selectedTarifItems = useMemo(
+    () => ingredientsTarif.filter((x) => selectedTarif[x]),
+    [ingredientsTarif, selectedTarif]
+  );
+
+  // ==========================
+  // KOKTEYL STATE
+  // ==========================
+  const [stageCocktail, setStageCocktail] = useState<StageCocktail>("upload");
+  const [chefTextCocktail, setChefTextCocktail] = useState<string>(
+    "İçecek fotoğrafı yükle; içindekileri bulup karışım önereceğim 🍸"
+  );
+  const [previewCocktail, setPreviewCocktail] = useState<string | null>(null);
+  const [drinksDetected, setDrinksDetected] = useState<string[]>([]);
+  const [selectedDrinks, setSelectedDrinks] = useState<Record<string, boolean>>({});
+  const [alcoholLevel, setAlcoholLevel] = useState<AlcoholLevel>("hafif");
+  const [cocktailResult, setCocktailResult] = useState<Cocktail | null>(null);
+
+  const selectedDrinkItems = useMemo(
+    () => drinksDetected.filter((x) => selectedDrinks[x]),
+    [drinksDetected, selectedDrinks]
+  );
+
+  // ==========================
+  // KOMBİN QUICK STATE (foto yok)
+  // ==========================
+  const [chefTextKombin, setChefTextKombin] = useState<string>("Bugün ne giysek? 😄");
+  const [weather, setWeather] = useState<Weather>("ılık");
+  const [place, setPlace] = useState<Place>("günlük");
+  const [style, setStyle] = useState<Style>("cool");
+  const [kombinLoading, setKombinLoading] = useState(false);
+  const [quickKombinOptions, setQuickKombinOptions] = useState<KombinOption[] | null>(null);
+
+  // ==========================
+  // NAV
+  // ==========================
+  const goHome = () => {
+    stopSpeech();
+    setMode("home");
+  };
+
+  const startTarif = () => {
+    stopSpeech();
+    setMode("tarif");
+    setStageTarif("upload");
+    setMealType("Yemek");
+    setTimeLimit(25);
+    setDiet("Serbest");
+    setChefTextTarif("Fotoğraf yükle; dolaptaki ürünleri çıkarıp seçtireceğim 😄");
+    setIngredientsTarif([]);
+    setSelectedTarif({});
+    setBestRecipe(null);
+    if (previewTarif) URL.revokeObjectURL(previewTarif);
+    setPreviewTarif(null);
+  };
+
+  const startCocktail = () => {
+    stopSpeech();
+    setMode("kokteyl");
+    setStageCocktail("upload");
+    setChefTextCocktail("İçecek fotoğrafı yükle; içindekileri bulup karışım önereceğim 🍸");
+    setDrinksDetected([]);
+    setSelectedDrinks({});
+    setAlcoholLevel("hafif");
+    setCocktailResult(null);
+    if (previewCocktail) URL.revokeObjectURL(previewCocktail);
+    setPreviewCocktail(null);
+  };
+
+  const startKombin = () => {
+    stopSpeech();
+    setMode("kombin");
+    setChefTextKombin("Bugün ne giysek? 3 soru soracağım 😄");
+    setQuickKombinOptions(null);
+    setKombinLoading(false);
+  };
+
+  // ==========================
+  // TARİF: photo -> /api/vision (mode=food)
+  // ==========================
+  const pickTarifPhoto = async (f: File) => {
+    if (previewTarif) URL.revokeObjectURL(previewTarif);
+    setPreviewTarif(URL.createObjectURL(f));
+
+    setBestRecipe(null);
+    setIngredientsTarif([]);
+    setSelectedTarif({});
+
+    setStageTarif("scanning");
+    const line = pick(FUN.scanFood);
+    setChefTextTarif(line);
+    sayTR(line);
+
+    try {
+      const fd = new FormData();
+      fd.append("image", f);
+      fd.append("mode", "food");
+
+      const r = await fetch("/api/vision", { method: "POST", body: fd });
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok) {
+        setChefTextTarif(`Vision hata: ${data?.error ?? "Bilinmeyen hata"}`);
+        setStageTarif("upload");
+        return;
+      }
+
+      const ing: string[] = Array.isArray(data?.ingredients) ? data.ingredients : [];
+      if (!data?.isCookable || ing.length < 2) {
+        const msg = data?.chefLine || "Foto net değil 😄 Daha yakın çekebilir misin?";
+        setChefTextTarif(msg);
+        sayTR(msg);
+        setStageTarif("upload");
+        return;
+      }
+
+      setIngredientsTarif(ing);
+      const init: Record<string, boolean> = {};
+      ing.forEach((x) => (init[x] = true));
+      setSelectedTarif(init);
+
+      const found = pick(FUN.foundFood);
+      setChefTextTarif(found);
+      sayTR(found);
+      setStageTarif("select");
+    } catch (e: any) {
+      setChefTextTarif(`Hata: ${e?.message ?? "Bilinmeyen hata"}`);
+      setStageTarif("upload");
+    }
+  };
+
+  const generateTarif = async () => {
+    if (selectedTarifItems.length < 2) {
+      const msg = "En az 2 ürün seçmelisin 😄";
+      setChefTextTarif(msg);
+      sayTR(msg);
+      return;
+    }
+
+    setStageTarif("scanning");
+    const line = pick(FUN.cooking);
+    setChefTextTarif(line);
+    sayTR(line);
+
+    try {
+      const r = await fetch("/api/recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: selectedTarifItems,
+          timeLimit,
+          diet,
+          mealType,
+        }),
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = `Tarif üretilemedi: ${data?.error ?? "Bilinmeyen hata"}`;
+        setChefTextTarif(msg);
+        sayTR(msg);
+        setStageTarif("select");
+        return;
+      }
+
+      const recipe: Recipe | null = data?.recipe ?? null;
+      if (!recipe) {
+        const msg = "Tarif formatı hatalı geldi 😄";
+        setChefTextTarif(msg);
+        sayTR(msg);
+        setStageTarif("select");
+        return;
+      }
+
+      setBestRecipe(recipe);
+
+      const ready = pick(FUN.readyFood);
+      setChefTextTarif(ready);
+      sayTR(ready);
+
+      const extra = String(data?.chefLine ?? "").trim();
+      if (extra) sayTR(extra);
+
+      setStageTarif("result");
+    } catch (e: any) {
+      const msg = `Hata: ${e?.message ?? "Bilinmeyen hata"}`;
+      setChefTextTarif(msg);
+      sayTR(msg);
+      setStageTarif("select");
+    }
+  };
+
+  // ==========================
+  // KOKTEYL: photo -> /api/vision (mode=drinks)
+  // ==========================
+  const pickCocktailPhoto = async (f: File) => {
+    if (previewCocktail) URL.revokeObjectURL(previewCocktail);
+    setPreviewCocktail(URL.createObjectURL(f));
+
+    setDrinksDetected([]);
+    setSelectedDrinks({});
+    setCocktailResult(null);
+
+    setStageCocktail("select");
+    const line = pick(FUN.scanDrinks);
+    setChefTextCocktail(line);
+    sayTR(line);
+
+    try {
+      const fd = new FormData();
+      fd.append("image", f);
+      fd.append("mode", "drinks");
+
+      const r = await fetch("/api/vision", { method: "POST", body: fd });
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok) {
+        setChefTextCocktail(`Vision hata: ${data?.error ?? "Bilinmeyen hata"}`);
+        setStageCocktail("upload");
+        return;
+      }
+
+      const items: string[] = Array.isArray(data?.drinks) ? data.drinks : [];
+      if (items.length < 1) {
+        const msg = data?.chefLine || "İçecekleri net göremedim 😄";
+        setChefTextCocktail(msg);
+        sayTR(msg);
+        setStageCocktail("upload");
+        return;
+      }
+
+      setDrinksDetected(items);
+      const init: Record<string, boolean> = {};
+      items.forEach((x) => (init[x] = true));
+      setSelectedDrinks(init);
+
+      const found = pick(FUN.foundDrinks);
+      setChefTextCocktail(found);
+      sayTR(found);
+      setStageCocktail("select");
+    } catch (e: any) {
+      setChefTextCocktail(`Hata: ${e?.message ?? "Bilinmeyen hata"}`);
+      setStageCocktail("upload");
+    }
+  };
+
+  const generateCocktail = async () => {
+    if (selectedDrinkItems.length < 2) {
+      const msg = "En az 2 içecek seç 😄";
+      setChefTextCocktail(msg);
+      sayTR(msg);
+      return;
+    }
+
+    setStageCocktail("mixing");
+    const line = pick(FUN.mixing);
+    setChefTextCocktail(line);
+    sayTR(line);
+
+    try {
+      const r = await fetch("/api/cocktail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: selectedDrinkItems, alcoholLevel }),
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = `Kokteyl üretilemedi: ${data?.error ?? "Bilinmeyen hata"}`;
+        setChefTextCocktail(msg);
+        sayTR(msg);
+        setStageCocktail("select");
+        return;
+      }
+
+      const c: Cocktail | null = data?.cocktail ?? null;
+      if (!c) {
+        const msg = "Kokteyl formatı hatalı geldi 😄";
+        setChefTextCocktail(msg);
+        sayTR(msg);
+        setStageCocktail("select");
+        return;
+      }
+
+      setCocktailResult(c);
+
+      const ready = pick(FUN.readyDrink);
+      setChefTextCocktail(ready);
+      sayTR(ready);
+
+      const extra = String(data?.chefLine ?? "").trim();
+      if (extra) sayTR(extra);
+
+      setStageCocktail("result");
+    } catch (e: any) {
+      const msg = `Hata: ${e?.message ?? "Bilinmeyen hata"}`;
+      setChefTextCocktail(msg);
+      sayTR(msg);
+      setStageCocktail("select");
+    }
+  };
+
+  // ==========================
+  // KOMBİN QUICK: /api/kombin (3 seçenek)
+  // ==========================
+  const generateKombinQuick = async () => {
+    setKombinLoading(true);
+    setChefTextKombin("Cin düşünür… stil pişer 😎");
+    sayTR("Kombin düşünüyorum.");
+
+    try {
+      const r = await fetch("/api/kombin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weather, place, style }),
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setChefTextKombin(data?.error || "Kombin üretilemedi 😄");
+        setQuickKombinOptions(null);
+        return;
+      }
+
+      const opts = Array.isArray(data?.options) ? (data.options as KombinOption[]) : null;
+      setChefTextKombin(data?.chefLine || "Şak! Kombinler geldi 😎");
+      setQuickKombinOptions(opts);
+      if (data?.chefLine) sayTR(String(data.chefLine));
+    } finally {
+      setKombinLoading(false);
+    }
+  };
+
+  // UI helper
+  function Pill({ children }: { children: React.ReactNode }) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-2 text-xs text-gray-700">
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f2f2f2] p-4">
+      <div className="mx-auto max-w-md space-y-4">
+        {/* Header */}
+        <div className="text-center">
+          <div className="text-2xl font-extrabold">FridgeChef</div>
+          <div className="text-xs text-gray-500">{subtitle}</div>
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <button
+              onClick={stopSpeech}
+              className="rounded-full bg-gray-100 px-3 py-2 text-xs font-extrabold text-gray-800"
+              title="Sesi durdur"
+            >
+              Sus
+            </button>
+          </div>
+        </div>
+
+        {/* HOME */}
+        {mode === "home" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+              <div className="text-xl font-extrabold">Lamba hazır…</div>
+              <div className="mt-1 text-sm text-gray-800">{homeLine}</div>
+            </div>
+
+            <button
+              onClick={() => setMode("assistant")}
+              className="w-full rounded-3xl border bg-black p-5 text-left text-white hover:opacity-95"
+            >
+              <div className="text-xl font-extrabold">Cin Asistan</div>
+              <div className="text-sm text-white/80 mt-1">Bugün ne yesek, ne içsek, ne giysek?</div>
+            </button>
+
+            <button
+              onClick={startTarif}
+              className="w-full rounded-3xl border bg-gray-50 p-5 text-left hover:bg-gray-100"
+            >
+              <div className="text-xl font-extrabold">Tarif</div>
+              <div className="text-sm text-gray-600 mt-1">Dolap foto → ürün seç → tarif</div>
+            </button>
+
+            <button
+              onClick={startCocktail}
+              className="w-full rounded-3xl border bg-gray-50 p-5 text-left hover:bg-gray-100"
+            >
+              <div className="text-xl font-extrabold">Kokteyl</div>
+              <div className="text-sm text-gray-600 mt-1">Şişe/bardak foto → içecek seç → karışım</div>
+            </button>
+
+            <button
+              onClick={startKombin}
+              className="w-full rounded-3xl border bg-gray-50 p-5 text-left hover:bg-gray-100"
+            >
+              <div className="text-xl font-extrabold">Bugün Ne Giysem</div>
+              <div className="text-sm text-gray-600 mt-1">3 soru → 3 kombin seçeneği</div>
+            </button>
+          </div>
+        )}
+
+        {/* ASSISTANT */}
+        {mode === "assistant" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+              <div className="text-xl font-extrabold">Cin Asistan</div>
+              <div className="mt-1 text-sm text-gray-800">Bugün sana ne lazım?</div>
+            </div>
+
+            <button
+              onClick={startTarif}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              Bugün ne yesem?
+            </button>
+
+            <button
+              onClick={startKombin}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              Bugün ne giysem?
+            </button>
+
+            <button
+              onClick={startCocktail}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              Bugün ne içsem?
+            </button>
+
+            <button
+              onClick={() => {
+                const modes: Mode[] = ["tarif", "kokteyl", "kombin"];
+                setMode(modes[Math.floor(Math.random() * modes.length)]);
+              }}
+              className="w-full rounded-2xl bg-gray-100 py-4 font-extrabold"
+            >
+              Cin seçsin
+            </button>
+
+            <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+              Ana menü
+            </button>
+          </div>
+        )}
+
+        {/* TARİF */}
+        {mode === "tarif" && (
+          <>
+            {stageTarif === "upload" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+                  <div className="text-xl font-extrabold">Tarif</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextTarif}</div>
+                </div>
+
+                <div className="h-56 rounded-2xl bg-gray-200 flex items-center justify-center">
+                  Buzdolabı fotoğrafı yükle
+                </div>
+
+                <button
+                  onClick={() => fileTarifRef.current?.click()}
+                  className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+                >
+                  Fotoğraf seç
+                </button>
+
+                <input
+                  ref={fileTarifRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pickTarifPhoto(f);
+                  }}
+                />
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageTarif === "scanning" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm text-center space-y-3">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4 text-left">
+                  <div className="text-xl font-extrabold">Hazırlanıyor…</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextTarif}</div>
+                </div>
+
+                {previewTarif ? (
+                  <img src={previewTarif} className="h-52 w-full rounded-2xl object-cover" alt="preview" />
+                ) : null}
+
+                <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-full w-3/4 animate-pulse bg-black" />
+                </div>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageTarif === "select" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+                  <div className="text-xl font-extrabold">Seçim</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextTarif}</div>
+                </div>
+
+                {previewTarif ? (
+                  <img src={previewTarif} className="h-44 w-full rounded-2xl object-cover" alt="preview" />
+                ) : null}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMealType("Yemek")}
+                    className={`flex-1 rounded-2xl py-3 font-extrabold ${
+                      mealType === "Yemek" ? "bg-black text-white" : "bg-gray-100"
+                    }`}
+                  >
+                    Yemek
+                  </button>
+                  <button
+                    onClick={() => setMealType("Salata")}
+                    className={`flex-1 rounded-2xl py-3 font-extrabold ${
+                      mealType === "Salata" ? "bg-black text-white" : "bg-gray-100"
+                    }`}
+                  >
+                    Salata
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-semibold">Süre (dk)</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={90}
+                      value={timeLimit}
+                      onChange={(e) => setTimeLimit(Number(e.target.value))}
+                      className="mt-1 w-full rounded-2xl border px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold">Diyet</label>
+                    <input
+                      value={diet}
+                      onChange={(e) => setDiet(e.target.value)}
+                      className="mt-1 w-full rounded-2xl border px-3 py-2 text-sm"
+                      placeholder="Serbest / Fit / Vejetaryen"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="font-extrabold">Bulunan ürünler</div>
+                    <div className="text-xs text-gray-500">
+                      {selectedTarifItems.length}/{ingredientsTarif.length}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {ingredientsTarif.map((i) => (
+                      <label key={i} className="flex items-center gap-2 rounded-2xl bg-white p-2 border">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedTarif[i]}
+                          onChange={(e) => setSelectedTarif((s) => ({ ...s, [i]: e.target.checked }))}
+                        />
+                        <span className="text-sm">{i}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={generateTarif}
+                  className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+                >
+                  Seçilenlerle {mealType} yap
+                </button>
+
+                <button onClick={() => setStageTarif("upload")} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Yeni foto
+                </button>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageTarif === "result" && bestRecipe && (
+              <RecipeCard
+                recipe={bestRecipe}
+                chefLine={chefTextTarif}
+                onStart={() => {
+                  sayTR("Tamam! Mutfak moduna geçiyoruz.");
+                  setStageTarif("cook");
+                }}
+                onNewPhoto={() => setStageTarif("upload")}
+              />
+            )}
+
+            {stageTarif === "cook" && bestRecipe && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-3">
+                <div className="text-xl font-extrabold">{bestRecipe.title}</div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Pill>{bestRecipe.timeMin ?? timeLimit} dk</Pill>
+                  <Pill>{mealType}</Pill>
+                </div>
+
+                <button
+                  onClick={() => {
+                    sayTR("Adımları okuyorum.");
+                    bestRecipe.steps.forEach((s, idx) => sayTR(`Adım ${idx + 1}. ${s}`, 0.9));
+                  }}
+                  className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+                >
+                  Adımları sesli oku
+                </button>
+
+                <div className="space-y-2">
+                  {bestRecipe.steps.map((s, idx) => (
+                    <div key={idx} className="rounded-2xl border bg-white p-3">
+                      <div className="text-xs text-gray-500">Adım {idx + 1}</div>
+                      <div className="text-sm font-semibold">{s}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setStageTarif("result")} className="rounded-2xl bg-gray-100 py-4 font-extrabold">
+                    Geri
+                  </button>
+                  <button onClick={() => setStageTarif("upload")} className="rounded-2xl bg-black py-4 text-white font-extrabold">
+                    Yeni foto
+                  </button>
+                </div>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* KOKTEYL */}
+        {mode === "kokteyl" && (
+          <>
+            {stageCocktail === "upload" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+                  <div className="text-xl font-extrabold">Kokteyl</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextCocktail}</div>
+                </div>
+
+                <div className="h-56 rounded-2xl bg-gray-200 flex items-center justify-center">
+                  Şişe/bardak fotoğrafı yükle
+                </div>
+
+                <button
+                  onClick={() => fileCocktailRef.current?.click()}
+                  className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+                >
+                  Fotoğraf seç
+                </button>
+
+                <input
+                  ref={fileCocktailRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pickCocktailPhoto(f);
+                  }}
+                />
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageCocktail === "select" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+                  <div className="text-xl font-extrabold">Seç & Karıştır</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextCocktail}</div>
+                </div>
+
+                {previewCocktail ? (
+                  <img src={previewCocktail} className="h-44 w-full rounded-2xl object-cover" alt="preview" />
+                ) : null}
+
+                <div className="grid grid-cols-3 gap-2">
+                  {(["hafif", "orta", "sert"] as const).map((lvl) => (
+                    <button
+                      key={lvl}
+                      onClick={() => setAlcoholLevel(lvl)}
+                      className={`rounded-2xl py-2 text-sm font-extrabold ${
+                        alcoholLevel === lvl ? "bg-black text-white" : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl border bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="font-extrabold">Bulunan içecekler</div>
+                    <div className="text-xs text-gray-500">
+                      {selectedDrinkItems.length}/{drinksDetected.length}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {drinksDetected.map((d) => (
+                      <label key={d} className="flex items-center gap-2 rounded-2xl bg-white p-2 border">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedDrinks[d]}
+                          onChange={(e) => setSelectedDrinks((s) => ({ ...s, [d]: e.target.checked }))}
+                        />
+                        <span className="text-sm">{d}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button onClick={generateCocktail} className="w-full rounded-2xl bg-black py-4 text-white font-extrabold">
+                  Karışım öner
+                </button>
+
+                <button onClick={() => setStageCocktail("upload")} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Yeni foto
+                </button>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageCocktail === "mixing" && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm text-center space-y-3">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4 text-left">
+                  <div className="text-xl font-extrabold">Karışıyor…</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextCocktail}</div>
+                </div>
+
+                {previewCocktail ? (
+                  <img src={previewCocktail} className="h-52 w-full rounded-2xl object-cover" alt="preview" />
+                ) : null}
+
+                <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-full w-3/4 animate-pulse bg-black" />
+                </div>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+
+            {stageCocktail === "result" && cocktailResult && (
+              <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+                <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+                  <div className="text-xl font-extrabold">{cocktailResult.title}</div>
+                  <div className="mt-1 text-sm text-gray-800">{chefTextCocktail}</div>
+                </div>
+
+                <div className="rounded-2xl border p-4">
+                  <div className="text-sm text-gray-600">{cocktailResult.why}</div>
+
+                  <div className="mt-3 text-sm font-extrabold">Adımlar</div>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    {cocktailResult.steps.map((s, idx) => (
+                      <li key={idx} className="flex gap-2">
+                        <span>•</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => {
+                    sayTR("Kokteyl adımlarını okuyorum.");
+                    cocktailResult.steps.forEach((s, i) => sayTR(`Adım ${i + 1}. ${s}`, 0.9));
+                  }}
+                  className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+                >
+                  Adımları sesli oku
+                </button>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setStageCocktail("select")} className="rounded-2xl bg-gray-100 py-4 font-extrabold">
+                    Geri
+                  </button>
+                  <button onClick={() => setStageCocktail("upload")} className="rounded-2xl bg-black py-4 text-white font-extrabold">
+                    Yeni foto
+                  </button>
+                </div>
+
+                <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+                  Ana menü
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* KOMBİN (Quick only) */}
+        {mode === "kombin" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-[22px] bg-[#f3eadf] p-4">
+              <div className="text-xl font-extrabold">Bugün Ne Giysem</div>
+              <div className="text-sm mt-1 text-gray-800">{chefTextKombin}</div>
+            </div>
+
+            <div className="rounded-2xl border bg-gray-50 p-4">
+              <div className="font-extrabold">Hava</div>
+              <div className="mt-2 flex gap-2">
+                {(["soğuk", "ılık", "sıcak"] as const).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => setWeather(w)}
+                    className={`flex-1 rounded-2xl py-3 text-sm font-extrabold ${
+                      weather === w ? "bg-black text-white" : "bg-white border"
+                    }`}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-gray-50 p-4">
+              <div className="font-extrabold">Nereye</div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(["günlük", "iş", "date", "parti"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPlace(p)}
+                    className={`rounded-2xl py-3 text-sm font-extrabold ${
+                      place === p ? "bg-black text-white" : "bg-white border"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-gray-50 p-4">
+              <div className="font-extrabold">Stil</div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(["sade", "cool", "şık", "komik"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStyle(s)}
+                    className={`rounded-2xl py-3 text-sm font-extrabold ${
+                      style === s ? "bg-black text-white" : "bg-white border"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={generateKombinQuick}
+              disabled={kombinLoading}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold disabled:opacity-60"
+            >
+              {kombinLoading ? "Cin düşünüyor…" : "Kombin öner"}
+            </button>
+
+            {quickKombinOptions && (
+              <div className="space-y-3">
+                {quickKombinOptions.map((o, idx) => (
+                  <div key={idx} className="rounded-2xl border bg-white p-4">
+                    <div className="text-lg font-extrabold">{o.title}</div>
+                    <div className="mt-1 text-sm text-gray-600">{o.why}</div>
+                    {o.colorTip ? (
+                      <div className="mt-2 text-xs text-gray-500">Renk: {o.colorTip}</div>
+                    ) : null}
+
+                    <div className="mt-3 text-sm font-extrabold">Parçalar</div>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {(o.items || []).map((it, i) => (
+                        <li key={i}>• {it}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={goHome} className="w-full rounded-2xl bg-gray-100 py-3 font-extrabold">
+              Ana menü
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

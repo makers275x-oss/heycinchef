@@ -1,0 +1,464 @@
+
+"use client";
+
+
+
+import React, { useMemo, useRef, useState } from "react";
+import RecipeCard, { Recipe } from "@/components/RecipeCard";
+
+type Stage = "upload" | "select" | "scanning" | "result" | "cook";
+type MealType = "Yemek" | "Salata";
+
+function speakTR(text: string, rate = 0.92) {
+  if (typeof window === "undefined") return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "tr-TR";
+    u.rate = rate;
+    u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function speakListTR(items: string[], chunkSize = 3) {
+  if (!items?.length) return;
+  speakTR("Şunları görüyorum:", 0.92);
+  await sleep(650);
+
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    speakTR(chunk.join(", "), 0.88);
+    await sleep(900);
+  }
+
+  speakTR("Tamamdır. Şimdi seçimini bekliyorum 😄", 0.92);
+}
+
+export default function FridgeChefApp() {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const [stage, setStage] = useState<Stage>("upload");
+  const [mealType, setMealType] = useState<MealType>("Yemek");
+  const [timeLimit, setTimeLimit] = useState(25);
+  const [diet, setDiet] = useState("Serbest");
+
+  const [chefMood, setChefMood] = useState<"happy" | "thinking" | "excited" | "warning">("happy");
+  const [chefText, setChefText] = useState(
+    "Merhaba! Fotoğraf yükle; dolaptaki ürünleri listeleyip seçtireceğim 😄"
+  );
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [ingredients, setIngredients] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [best, setBest] = useState<Recipe | null>(null);
+
+  const selectedItems = useMemo(() => {
+    return ingredients.filter((i) => selected[i]);
+  }, [ingredients, selected]);
+
+  const stepsText = useMemo(() => {
+    if (!best?.steps?.length) return "";
+    return best.steps.map((s, i) => `Adım ${i + 1}. ${s}`).join(". ");
+  }, [best]);
+
+  const resetAll = () => {
+    setStage("upload");
+    setMealType("Yemek");
+    setTimeLimit(25);
+    setDiet("Serbest");
+    setIngredients([]);
+    setSelected({});
+    setBest(null);
+    setChefMood("happy");
+    setChefText("Yeni foto yükle, tekrar yapalım 😄");
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
+  const pickPhoto = async (f: File) => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(URL.createObjectURL(f));
+
+    setBest(null);
+    setIngredients([]);
+    setSelected({});
+
+    setStage("scanning");
+    setChefMood("thinking");
+    setChefText("Foto geldi! Cin Şef dolabı tarıyor…");
+    speakTR("Foto geldi! Cin Şef dolabı tarıyor…");
+
+    try {
+      const fd = new FormData();
+      fd.append("image", f);
+
+      const v = await fetch("/api/vision", { method: "POST", body: fd });
+      const data = await v.json().catch(() => ({}));
+
+      if (!v.ok) {
+        setChefMood("warning");
+        setChefText(`Vision hata verdi: ${data?.error ?? "Bilinmeyen hata"}`);
+        setStage("upload");
+        return;
+      }
+
+      const isCookable = Boolean(data?.isCookable);
+      const ing: string[] = Array.isArray(data?.ingredients) ? data.ingredients : [];
+      const chefLine = String(data?.chefLine ?? "");
+      const reason = String(data?.reason ?? "");
+      const confidence = Number(data?.confidence ?? 0);
+
+      if (!isCookable) {
+        const msg =
+          chefLine ||
+          `Bundan yemek olmaz 😄 ${reason ? "Sebep: " + reason : ""}${
+            confidence ? ` (Eminlik: %${confidence})` : ""
+          }`;
+        setChefMood("warning");
+        setChefText(msg);
+        speakTR(msg);
+        setStage("upload");
+        return;
+      }
+
+      if (ing.length < 1) {
+        const msg = "Fotoğraftan yeterli gıda tespit edemedim 😄 Buzdolabını biraz daha net çekebilir misin?";
+        setChefMood("warning");
+        setChefText(msg);
+        speakTR(msg);
+        setStage("upload");
+        return;
+      }
+
+      setIngredients(ing);
+
+      // default hepsi seçili
+      const initSel: Record<string, boolean> = {};
+      ing.forEach((x) => (initSel[x] = true));
+      setSelected(initSel);
+
+      setChefMood("excited");
+      setChefText(`${chefLine ? chefLine + " " : ""}Ürünleri buldum! Şimdi sayıyorum…`);
+      speakTR(`${chefLine ? chefLine + " " : ""}Ürünleri buldum! Şimdi sayıyorum…`);
+      await speakListTR(ing.slice(0, 12), 3);
+      if (ing.length > 12) speakTR(`Devamında ${ing.length - 12} ürün daha var.`, 0.92);
+
+      setStage("select");
+    } catch (e: any) {
+      const msg = `Vision isteği başarısız: ${e?.message ?? "Bilinmeyen hata"}`;
+      setChefMood("warning");
+      setChefText(msg);
+      speakTR(msg);
+      setStage("upload");
+    }
+  };
+
+  const generateFromSelection = async () => {
+    if (selectedItems.length < 2) {
+      const msg = "En az 2 ürün seçmelisin 😄";
+      setChefMood("warning");
+      setChefText(msg);
+      speakTR(msg);
+      return;
+    }
+
+    setStage("scanning");
+    setChefMood("thinking");
+    setChefText(`${mealType} için seçtiklerini büyülüyorum…`);
+    speakTR(`${mealType} için seçtiklerini büyülüyorum…`);
+
+    try {
+      const r = await fetch("/api/recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: selectedItems,
+          timeLimit,
+          diet,
+          mealType,
+        }),
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = `Tarif üretilemedi: ${data?.error ?? "Bilinmeyen hata"}`;
+        setChefMood("warning");
+        setChefText(msg);
+        speakTR(msg);
+        setStage("select");
+        return;
+      }
+
+      const recipe: any = data?.recipe;
+      if (!recipe) {
+        const msg = "Tarif formatı beklediğim gibi gelmedi 😄";
+        setChefMood("warning");
+        setChefText(msg);
+        speakTR(msg);
+        setStage("select");
+        return;
+      }
+
+      // tags default
+      recipe.tags =
+        recipe.tags ||
+        (mealType === "Salata" ? ["ferah", "hızlı"] : ["acı", "hızlı"]);
+
+      // ✅ AI image generation (tarif adına göre görsel üret)
+      // 1) imagePrompt varsa onu kullan, yoksa title’dan üret
+      const imagePrompt =
+        recipe.imagePrompt ||
+        (mealType === "Salata"
+          ? `Photorealistic top-down fresh colorful salad bowl, ingredients match: ${selectedItems.join(
+              ", "
+            )}, natural light, high detail, no text, no logo, no watermark`
+          : `Photorealistic spicy ${recipe.title} served in a pan or plate, ingredients match: ${selectedItems.join(
+              ", "
+            )}, warm natural light, high detail, no text, no logo, no watermark`);
+
+      // 2) Görseli backend’den üret
+      
+
+      setBest(recipe as Recipe);
+
+      const line = data?.chefLine ?? "Şak! Tarif hazır 🫰";
+      setChefMood("excited");
+      setChefText(line);
+      speakTR(line);
+
+      setStage("result");
+    } catch (e: any) {
+      const msg = `Tarif isteği başarısız: ${e?.message ?? "Bilinmeyen hata"}`;
+      setChefMood("warning");
+      setChefText(msg);
+      speakTR(msg);
+      setStage("select");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f2f2f2] p-4">
+      <div className="mx-auto max-w-md space-y-4">
+        {/* Header */}
+        <div className="text-center">
+          <div className="text-2xl font-extrabold">FridgeChef</div>
+          <div className="text-xs text-gray-500">Dolap → Seç → Tarif → Görsel</div>
+        </div>
+
+        {/* UPLOAD */}
+        {stage === "upload" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+              <div className="text-xl font-extrabold">Lamba serviste 😄</div>
+              <div className="mt-1 text-sm text-gray-800">{chefText}</div>
+            </div>
+
+            <div className="h-56 rounded-2xl bg-gray-200 flex items-center justify-center">
+              📷 Buzdolabı fotoğrafı yükle
+            </div>
+
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              Fotoğraf seç
+            </button>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) pickPhoto(f);
+              }}
+            />
+          </div>
+        )}
+
+        {/* SELECT */}
+        {stage === "select" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-4">
+            <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4">
+              <div className="text-xl font-extrabold">Seçim zamanı 😄</div>
+              <div className="mt-1 text-sm text-gray-800">{chefText}</div>
+            </div>
+
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                className="h-44 w-full rounded-2xl object-cover"
+                alt="preview"
+              />
+            ) : null}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMealType("Yemek")}
+                className={`flex-1 rounded-2xl py-3 font-extrabold ${
+                  mealType === "Yemek" ? "bg-black text-white" : "bg-gray-100"
+                }`}
+              >
+                🍲 Yemek
+              </button>
+              <button
+                onClick={() => setMealType("Salata")}
+                className={`flex-1 rounded-2xl py-3 font-extrabold ${
+                  mealType === "Salata" ? "bg-black text-white" : "bg-gray-100"
+                }`}
+              >
+                🥗 Salata
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-semibold">Süre (dk)</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={90}
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(Number(e.target.value))}
+                  className="mt-1 w-full rounded-2xl border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold">Diyet</label>
+                <input
+                  value={diet}
+                  onChange={(e) => setDiet(e.target.value)}
+                  className="mt-1 w-full rounded-2xl border px-3 py-2 text-sm"
+                  placeholder="Serbest / Fit / Vejetaryen"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-gray-50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="font-extrabold">🧊 Bulunan ürünler</div>
+                <div className="text-xs text-gray-500">
+                  {selectedItems.length}/{ingredients.length}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {ingredients.map((i) => (
+                  <label key={i} className="flex items-center gap-2 rounded-2xl bg-white p-2 border">
+                    <input
+                      type="checkbox"
+                      checked={!!selected[i]}
+                      onChange={(e) =>
+                        setSelected((s) => ({ ...s, [i]: e.target.checked }))
+                      }
+                    />
+                    <span className="text-sm">{i}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={generateFromSelection}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              Seçilenlerle {mealType} yap
+            </button>
+
+            <button
+              onClick={resetAll}
+              className="w-full rounded-2xl bg-gray-100 py-4 font-extrabold"
+            >
+              Yeni foto
+            </button>
+          </div>
+        )}
+
+        {/* SCANNING */}
+        {stage === "scanning" && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm text-center space-y-3">
+            <div className="rounded-[22px] bg-[#f3eadf] px-4 py-4 text-left">
+              <div className="text-xl font-extrabold">Büyü yapıyorum… ✨</div>
+              <div className="mt-1 text-sm text-gray-800">{chefText}</div>
+            </div>
+
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                className="h-52 w-full rounded-2xl object-cover"
+                alt="preview"
+              />
+            ) : null}
+
+            <div className="text-lg font-extrabold">🤖 Hazırlanıyor…</div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+              <div className="h-full w-3/4 animate-pulse bg-black" />
+            </div>
+            <div className="text-xs text-gray-500">Tarif + görsel hazırlanıyor</div>
+          </div>
+        )}
+
+        {/* RESULT — tek kart: Chef + bubble + hero + white card */}
+        {stage === "result" && best && (
+          <RecipeCard
+            recipe={best}
+            chefLine={chefText}
+            onStart={() => setStage("cook")}
+            onNewPhoto={resetAll}
+          />
+        )}
+
+        {/* COOK */}
+        {stage === "cook" && best && (
+          <div className="rounded-[28px] border bg-white p-6 shadow-sm space-y-3">
+            <div className="text-xl font-extrabold">{best.title}</div>
+
+            <button
+              onClick={() => stepsText && speakTR(stepsText, 0.9)}
+              className="w-full rounded-2xl bg-black py-4 text-white font-extrabold"
+            >
+              🔊 Adımları sesli oku
+            </button>
+
+            <div className="space-y-2">
+              {best.steps.map((s, idx) => (
+                <div key={idx} className="rounded-2xl border bg-white p-3">
+                  <div className="text-xs text-gray-500">Adım {idx + 1}</div>
+                  <div className="text-sm font-semibold">{s}</div>
+                  <button
+                    onClick={() => speakTR(`Adım ${idx + 1}. ${s}`, 0.9)}
+                    className="mt-2 rounded-xl bg-gray-100 px-3 py-2 text-xs font-extrabold"
+                  >
+                    Bu adımı oku
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setStage("result")}
+                className="rounded-2xl bg-gray-100 py-4 font-extrabold"
+              >
+                Geri
+              </button>
+              <button
+                onClick={resetAll}
+                className="rounded-2xl bg-black py-4 text-white font-extrabold"
+              >
+                Yeni foto
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,40 @@
+"use client";
+
+import React from "react";
+
+export type Recipe = {
+  id: string;
+  title: string;
+  timeMin: number;
+  calories?: number;
+  why?: string;
+  steps?: string[];
+};
+
+export default function RecipeCard({
+  recipe,
+  onStart,
+}: {
+  recipe: Recipe;
+  onStart: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-white p-5 shadow-sm">
+      <div className="text-lg font-semibold">{recipe.title}</div>
+      <div className="mt-1 text-sm text-gray-500">
+        ⏱️ {recipe.timeMin} dk {recipe.calories ? `• ${recipe.calories} kcal` : ""}
+      </div>
+
+      {recipe.why ? (
+        <p className="mt-3 text-sm text-gray-700">{recipe.why}</p>
+      ) : null}
+
+      <button
+        onClick={onStart}
+        className="mt-4 w-full rounded-xl bg-black py-3 text-white"
+      >
+        Başla (adım adım)
+      </button>
+    </div>
+  );
+}
