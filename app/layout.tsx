@@ -18,6 +18,9 @@ export const metadata = {
     template: "%s | HeyCinChef",
   },
   description: "AI destekli tarif asistanı",
+icons: {
+icon: "/icon.png",
+},
 };
 
 export default function RootLayout({
