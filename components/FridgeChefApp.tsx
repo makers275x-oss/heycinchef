@@ -54,9 +54,9 @@ function aiLine(screen: Screen) {
 }
 
 const glassPanel =
-  "rounded-[30px] border border-white/45 bg-white/86 backdrop-blur-md shadow-[0_12px_40px_rgba(15,23,42,0.12)]";
+  "rounded-[28px] border border-white/50 bg-white/88 backdrop-blur-md shadow-[0_10px_32px_rgba(15,23,42,0.12)]";
 const glassPanelSoft =
-  "rounded-[26px] border border-white/40 bg-white/82 backdrop-blur-md shadow-[0_10px_30px_rgba(15,23,42,0.10)]";
+  "rounded-[24px] border border-white/45 bg-white/84 backdrop-blur-md shadow-[0_8px_24px_rgba(15,23,42,0.10)]";
 
 const ManualInput = React.memo(function ManualInput(props: {
   value: string;
@@ -79,7 +79,7 @@ const ManualInput = React.memo(function ManualInput(props: {
         }
       }}
       placeholder={props.placeholder}
-      className="w-full rounded-2xl border border-black/15 bg-white/95 px-4 py-3 text-[15px] font-medium text-[#111827] outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
+      className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-[15px] font-medium text-[#111827] outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-200"
     />
   );
 });
@@ -96,7 +96,7 @@ const ManualPanel = React.memo(function ManualPanel(props: {
   return (
     <div className={`mt-4 p-4 ${glassPanelSoft}`}>
       <div className="flex items-center justify-between">
-        <div className="text-base font-black tracking-tight text-[#111827]">Manual ekle</div>
+        <div className="text-base font-black text-[#111827]">Manual ekle</div>
         <div className="text-xs font-bold text-slate-600">{props.manualItems.length}/12</div>
       </div>
 
@@ -111,7 +111,7 @@ const ManualPanel = React.memo(function ManualPanel(props: {
         <button
           type="button"
           onClick={props.addManual}
-          className="rounded-2xl bg-black px-4 py-3 font-extrabold text-white shadow-sm transition hover:scale-[1.01]"
+          className="rounded-2xl bg-black px-4 py-3 font-extrabold text-white shadow-sm transition active:scale-[0.98]"
         >
           Ekle
         </button>
@@ -184,12 +184,12 @@ function ChefCin({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onClick?.();
       }}
-      className="fixed bottom-4 left-4 z-50 select-none cursor-pointer"
+      className="select-none cursor-pointer"
       style={{ background: "transparent" }}
       aria-label="Chef Cin"
     >
-      <div className="pointer-events-auto mb-2 mr-auto w-max max-w-[330px] rounded-[28px] border border-white/50 bg-white/92 px-4 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
-        {bubble || "Hazırım 😎"}
+      <div className="pointer-events-auto mb-2 mr-auto w-max max-w-[290px] rounded-[26px] border border-white/50 bg-white/92 px-4 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
+        <div className="line-clamp-2">{bubble || "Hazırım 😎"}</div>
 
         <div className="mt-2 flex gap-2">
           <button
@@ -232,7 +232,7 @@ function ChefCin({
         <div className="mt-2 text-[11px] font-semibold text-slate-600">{hint}</div>
       </div>
 
-      <svg width="190" height="230" viewBox="0 0 150 170" className="drop-shadow-xl">
+      <svg width="150" height="190" viewBox="0 0 150 170" className="drop-shadow-xl">
         <ellipse cx="78" cy="160" rx="42" ry="9" fill="rgba(0,0,0,0.15)" />
 
         <g>
@@ -294,7 +294,7 @@ function ChefCin({
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
-  const [homeTitle] = useState("Lamba hazır…");
+  const [homeTitle] = useState("Lamba hazır...");
   const [homeSubtitle] = useState("Cin Asistan burada 😄");
   const [homeLine] = useState("Tarif mi, kokteyl mi? Foto çek, ben büyüyü yapayım 👀");
 
@@ -862,7 +862,7 @@ export default function FridgeChefApp() {
 
   const PageHeader = ({ title }: { title: string }) => (
     <div className="flex items-start justify-between gap-3">
-      <div className="text-[26px] font-black tracking-tight text-[#111827]">{title}</div>
+      <div className="text-[24px] font-black tracking-tight text-[#111827]">{title}</div>
       <button
         onClick={goHome}
         className="rounded-2xl border border-black/15 bg-white/95 px-3 py-2 text-sm font-extrabold text-[#111827] shadow-sm"
@@ -924,10 +924,12 @@ export default function FridgeChefApp() {
   };
 
   const PremiumPanel = () => (
-    <div className="mt-4 rounded-[26px] border border-amber-200/70 bg-gradient-to-br from-amber-50/90 to-white/95 p-4 shadow-sm">
+    <div className="mt-4 rounded-[24px] border border-amber-200/70 bg-gradient-to-br from-amber-50/95 to-white/95 p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="text-sm font-black text-[#111827]">Premium Okuma</div>
-        <div className="text-xs font-extrabold text-slate-700">{safeSteps.length ? `${stepIndex + 1}/${safeSteps.length}` : "0/0"}</div>
+        <div className="text-xs font-extrabold text-slate-700">
+          {safeSteps.length ? `${stepIndex + 1}/${safeSteps.length}` : "0/0"}
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -969,7 +971,7 @@ export default function FridgeChefApp() {
 
   const UploadPanel = ({ label, scanLabel }: { label: string; scanLabel: string }) => (
     <>
-      <div className="mt-4 rounded-[28px] border border-white/45 bg-white/76 p-6 text-center backdrop-blur-md shadow-sm">
+      <div className={`mt-4 p-5 text-center ${glassPanelSoft}`}>
         <div className="text-sm font-black text-[#111827]">{label}</div>
         {imagePreviewUrl ? (
           <img
@@ -978,7 +980,7 @@ export default function FridgeChefApp() {
             alt="preview"
           />
         ) : (
-          <div className="mt-4 rounded-3xl border border-dashed border-black/10 bg-white/60 px-4 py-10 text-sm font-semibold text-slate-600">
+          <div className="mt-4 rounded-3xl border border-dashed border-black/10 bg-white/70 px-4 py-10 text-sm font-semibold text-slate-600">
             Foto seçince önizleme burada görünür.
           </div>
         )}
@@ -994,7 +996,7 @@ export default function FridgeChefApp() {
 
       <button
         onClick={() => fileRef.current?.click()}
-        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:scale-[1.01]"
+        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition active:scale-[0.98]"
       >
         Fotoğraf seç
       </button>
@@ -1013,7 +1015,7 @@ export default function FridgeChefApp() {
     if (screen === "recipe") {
       return (
         <div className={`mt-5 p-4 ${glassPanelSoft}`}>
-          <div className="text-base font-black tracking-tight text-[#111827]">Bulunan ürünler</div>
+          <div className="text-base font-black text-[#111827]">Bulunan ürünler</div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {visionFood.map((it) => {
               const checked = selectedNames.includes(normalize(it.name));
@@ -1034,7 +1036,7 @@ export default function FridgeChefApp() {
 
     return (
       <div className={`mt-5 p-4 ${glassPanelSoft}`}>
-        <div className="text-base font-black tracking-tight text-[#111827]">Bulunan içkiler</div>
+        <div className="text-base font-black text-[#111827]">Bulunan içkiler</div>
         <div className="mt-3 grid grid-cols-1 gap-2">
           {visionDrinks.map((it, idx) => {
             const key = `${it.name}-${idx}`;
@@ -1064,8 +1066,8 @@ export default function FridgeChefApp() {
     if (!data) return null;
 
     return (
-      <div className="mt-5 rounded-[30px] border border-white/45 bg-white/90 p-5 backdrop-blur-md shadow-[0_14px_38px_rgba(15,23,42,0.12)]">
-        <div className="text-[23px] font-black tracking-tight text-[#111827]">{data.title}</div>
+      <div className={`mt-5 p-5 ${glassPanel}`}>
+        <div className="text-[22px] font-black tracking-tight text-[#111827]">{data.title}</div>
         <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{data.summary}</div>
 
         <PremiumPanel />
@@ -1113,14 +1115,8 @@ export default function FridgeChefApp() {
   const chefMode: "idle" | "scan" | "cook" | "talk" =
     isScanning ? "scan" : isGenerating ? "cook" : isSpeaking ? "talk" : "idle";
 
- return (
-  <div
-    className="min-h-screen bg-cover bg-center bg-fixed"
-    style={{
-      backgroundImage:
-        "linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.28)), url('/genie-bg.png')",
-    }}
-  >
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden">
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
@@ -1128,28 +1124,26 @@ export default function FridgeChefApp() {
         }}
       />
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(248,250,252,0.74)_0%,rgba(241,245,249,0.84)_38%,rgba(226,232,240,0.92)_100%)]" />
+      <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,215,120,0.20),transparent_30%),radial-gradient(circle_at_left_bottom,rgba(59,130,246,0.12),transparent_24%),radial-gradient(circle_at_right,rgba(168,85,247,0.10),transparent_20%)]" />
-
-      <div className="relative mx-auto w-full max-w-md px-4 py-5">
-        <div className="rounded-[34px] border border-amber-200/60 bg-gradient-to-br from-[#fff8ee]/96 via-[#f8efd9]/94 to-[#f4e6c8]/92 p-5 shadow-[0_14px_40px_rgba(245,158,11,0.14)] backdrop-blur-md">
+      <div className="relative mx-auto w-full max-w-md px-4 pt-6 pb-28">
+        <div className="rounded-[34px] border border-amber-200/70 bg-[#fff8ee]/95 p-5 shadow-[0_18px_40px_rgba(245,158,11,0.18)] backdrop-blur-sm">
           <div className="text-[26px] font-black tracking-tight text-[#111827]">{homeTitle}</div>
           <div className="mt-1 text-[17px] font-black text-[#1f2937]">{homeSubtitle}</div>
-          <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{homeLine}</div>
+          <div className="mt-2 text-[15px] font-semibold leading-7 text-slate-700">{homeLine}</div>
         </div>
 
         {screen === "home" && (
-          <div className="mt-4 grid gap-3">
+          <div className="mt-5 grid gap-4">
             <button
               onClick={() => {
                 resetAll();
                 setScreen("recipe");
               }}
-              className="w-full rounded-[32px] bg-black/96 p-5 text-left text-white shadow-[0_12px_34px_rgba(0,0,0,0.24)] backdrop-blur-sm transition hover:scale-[1.01]"
+              className="w-full rounded-[32px] bg-black p-5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition active:scale-[0.98]"
             >
-              <div className="text-[23px] font-black tracking-tight">Tarif</div>
-              <div className="mt-1 text-[15px] font-semibold text-white/90">Dolap foto → tara → seç → tarif</div>
+              <div className="text-[22px] font-black tracking-tight">Tarif</div>
+              <div className="mt-2 text-[15px] font-semibold text-white/85">Dolap foto → tara → seç → tarif</div>
             </button>
 
             <button
@@ -1157,10 +1151,10 @@ export default function FridgeChefApp() {
                 resetAll();
                 setScreen("cocktail");
               }}
-              className="w-full rounded-[32px] border border-white/40 bg-white/88 p-5 text-left shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur-md transition hover:scale-[1.01]"
+              className="w-full rounded-[32px] border border-white/40 bg-white/95 p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm transition active:scale-[0.98]"
             >
-              <div className="text-[23px] font-black tracking-tight text-[#111827]">Kokteyl</div>
-              <div className="mt-1 text-[15px] font-semibold text-slate-700">Şişe foto → tara → seç → karışım</div>
+              <div className="text-[22px] font-black tracking-tight text-[#111827]">Kokteyl</div>
+              <div className="mt-2 text-[15px] font-semibold text-slate-700">Şişe foto → tara → seç → karışım</div>
             </button>
           </div>
         )}
@@ -1222,7 +1216,7 @@ export default function FridgeChefApp() {
                     else generateCocktail();
                   }}
                   disabled={isGenerating}
-                  className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:scale-[1.01] disabled:opacity-40"
+                  className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition active:scale-[0.98] disabled:opacity-40"
                 >
                   {isGenerating ? "Hazırlanıyor…" : screen === "recipe" ? "Seçilenlerle Tarif Yap" : "Seçilenlerle Karışım Yap"}
                 </button>
@@ -1244,19 +1238,21 @@ export default function FridgeChefApp() {
         </div>
       </div>
 
-      <ChefCin
-        mode={chefMode}
-        bubble={lastSpokenText}
-        screen={screen}
-        cinAction={cinAction}
-        onClick={() => {
-          resetIdleTimer("cinClick");
-          speak("Hadi canım… foto ver de büyüyü yapayım 😎");
-        }}
-        onFast={actionFast}
-        onFit={actionFit}
-        onNew={actionNew}
-      />
+      <div className="fixed bottom-6 right-4 z-50">
+        <ChefCin
+          mode={chefMode}
+          bubble={lastSpokenText}
+          screen={screen}
+          cinAction={cinAction}
+          onClick={() => {
+            resetIdleTimer("cinClick");
+            speak("Hadi canım… foto ver de büyüyü yapayım 😎");
+          }}
+          onFast={actionFast}
+          onFit={actionFit}
+          onNew={actionNew}
+        />
+      </div>
     </div>
   );
 }
