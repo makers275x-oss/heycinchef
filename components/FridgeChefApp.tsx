@@ -13,6 +13,13 @@ type RecipeResponse = {
   summary: string;
   ingredients: string[];
   steps: string[];
+  calories?: string;
+  healthScore?: number;
+  protein?: string;
+  carbs?: string;
+  fat?: string;
+  duration?: string;
+  difficulty?: string;
 };
 
 type CocktailResponse = {
@@ -21,6 +28,11 @@ type CocktailResponse = {
   ingredients: string[];
   steps: string[];
   tips?: string[];
+  strength?: string;
+  score?: number;
+  abv?: string;
+  tasteProfile?: string;
+  drinkingStyle?: string;
 };
 
 function normalize(s: string) {
@@ -375,9 +387,7 @@ export default function FridgeChefApp() {
 
   const safeSteps = useMemo(() => {
     const steps = screen === "cocktail" ? cocktail?.steps : recipe?.steps;
-    return (Array.isArray(steps) ? steps : [])
-      .map((x) => String(x || "").trim())
-      .filter(Boolean);
+    return (Array.isArray(steps) ? steps : []).map((x) => String(x || "").trim()).filter(Boolean);
   }, [screen, recipe, cocktail]);
 
   const activeStepText = safeSteps[stepIndex] || safeSteps[0] || "";
@@ -830,7 +840,7 @@ export default function FridgeChefApp() {
         ingredients: data.ingredients || [],
       });
 
-      speak("Tarif hazır. Beğenmezsen yeni bir numara daha yaparım 😏");
+      speak("Tarif hazır. Kalori ve sağlık puanını da çıkardım 😎");
     } catch (e: any) {
       setError(e?.message || "Tarif üretilemedi");
       speak("Tarif çıkmadı… ama ben vazgeçmem 😅");
@@ -895,7 +905,7 @@ export default function FridgeChefApp() {
         ingredients: data.ingredients || [],
       });
 
-      speak("Karışım hazır. Beğenmezsen başka bir havaya gireriz 😏");
+      speak("Karışım hazır. Güç ve alkol oranını da hesapladım 😎");
     } catch (e: any) {
       setError(e?.message || "Kokteyl üretilemedi");
       speak("Kokteyl çıkmadı… ama sahneyi terk etmiyorum 😅");
@@ -1102,6 +1112,90 @@ export default function FridgeChefApp() {
     );
   };
 
+  const MetaInfoPanel = () => {
+    const data = screen === "cocktail" ? cocktail : recipe;
+    if (!data) return null;
+
+    if (screen === "recipe") {
+      return (
+        <div className="mt-4 rounded-[24px] border border-white/45 bg-white/90 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-md">
+          <div className="text-sm font-black text-[#111827]">Besin ve Tarif Özeti</div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Kalori</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">{recipe?.calories || "-"}</div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Sağlık Puanı</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">
+                {typeof recipe?.healthScore === "number" ? `${recipe.healthScore}/10` : "-"}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Protein</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">{recipe?.protein || "-"}</div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Karbonhidrat</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">{recipe?.carbs || "-"}</div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Yağ</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">{recipe?.fat || "-"}</div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-xs font-bold text-slate-500">Süre / Zorluk</div>
+              <div className="mt-1 text-sm font-black text-[#111827]">
+                {recipe?.duration || "-"} {recipe?.difficulty ? `• ${recipe.difficulty}` : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-4 rounded-[24px] border border-white/45 bg-white/90 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-md">
+        <div className="text-sm font-black text-[#111827]">Kokteyl Profili</div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="text-xs font-bold text-slate-500">Güç</div>
+            <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.strength || "-"}</div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="text-xs font-bold text-slate-500">Tahmini Alkol</div>
+            <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.abv || "-"}</div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="text-xs font-bold text-slate-500">Puan</div>
+            <div className="mt-1 text-sm font-black text-[#111827]">
+              {typeof cocktail?.score === "number" ? `${cocktail.score}/100` : "-"}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="text-xs font-bold text-slate-500">İçim Tipi</div>
+            <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.drinkingStyle || "-"}</div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3 col-span-2">
+            <div className="text-xs font-bold text-slate-500">Tat Profili</div>
+            <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.tasteProfile || "-"}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const UploadPanel = ({ label, scanLabel }: { label: string; scanLabel: string }) => (
     <>
       <div className={`mt-4 p-5 text-center ${glassPanelSoft}`}>
@@ -1232,6 +1326,7 @@ export default function FridgeChefApp() {
 
         <PremiumPanel />
         <StepFunPanel />
+        <MetaInfoPanel />
 
         <div className="mt-5 rounded-3xl bg-slate-50/80 p-4">
           <div className="text-sm font-black text-[#111827]">Malzemeler</div>
@@ -1262,6 +1357,17 @@ export default function FridgeChefApp() {
             })}
           </ol>
         </div>
+
+        {screen === "cocktail" && cocktail?.tips?.length ? (
+          <div className="mt-4 rounded-3xl bg-white/70 p-4">
+            <div className="text-sm font-black text-[#111827]">Cin İpuçları</div>
+            <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
+              {cocktail.tips.map((tip, i) => (
+                <li key={i}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
           {screen === "cocktail"
@@ -1313,6 +1419,21 @@ export default function FridgeChefApp() {
           <div className="text-[26px] font-black tracking-tight text-[#111827]">{homeTitle}</div>
           <div className="mt-1 text-[18px] font-black text-[#1f2937]">{homeSubtitle}</div>
           <div className="mt-2 text-[15px] font-semibold leading-7 text-slate-700">{homeLine}</div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
+              AI Vision
+            </div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
+              Türkçe Tarif
+            </div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
+              Adım Adım Okuma
+            </div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
+              AI Sunum Görseli
+            </div>
+          </div>
         </div>
 
         {screen === "home" && (

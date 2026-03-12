@@ -3,14 +3,11 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** ✅ Responses API'den metni sağlam şekilde çek */
 function extractOutputText(respJson: any): string {
-  // 1) Bazen direkt burada gelir
   if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
     return respJson.output_text.trim();
   }
 
-  // 2) Çoğu zaman output -> content -> text içinde gelir
   const out = Array.isArray(respJson?.output) ? respJson.output : [];
   for (const item of out) {
     const content = Array.isArray(item?.content) ? item.content : [];
@@ -27,38 +24,59 @@ function extractOutputText(respJson: any): string {
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "OPENAI_API_KEY yok" }, { status: 500 });
+    if (!apiKey) {
+      return NextResponse.json({ error: "OPENAI_API_KEY yok" }, { status: 500 });
+    }
 
     const body = await req.json().catch(() => ({}));
     const items: string[] = Array.isArray(body?.items) ? body.items : [];
     const variation: number = Number.isFinite(body?.variation) ? Number(body.variation) : 0;
 
-    if (items.length === 0) return NextResponse.json({ error: "items boş" }, { status: 400 });
+    if (items.length === 0) {
+      return NextResponse.json({ error: "items boş" }, { status: 400 });
+    }
 
-    // ✅ FridgeChef: net + kısa + temel mutfak serbest
     const prompt = `
 Sen “Cin Şef”sin.
-Kısa konuş. Maks 1 espri.
+Kısa konuş. Maksimum 1 küçük espri yap.
 Sadece 1 tarif üret.
 
 Elimdeki malzemeler: ${items.join(", ")}
 Variation: ${variation}
 
 Kurallar:
-- Tahmin yok: listede yoksa “var” deme.
-- Listedekiler dışına çıkma. (İSTİSNA: su, tuz, yağ, karabiber serbest)
-- 5+ kısa adım yaz (satır satır okunabilir).
-- SADECE geçerli JSON döndür. Açıklama/markdown yok.
+- ÇIKTI DİLİ: Türkçe zorunlu. İngilizce kelime kullanma.
+- Tahmin yok: listede olmayan bir malzemeyi varmış gibi yazma.
+- Listedekiler dışına çıkma.
+- İSTİSNA olarak sadece şu temel mutfak öğeleri serbest: su, tuz, yağ, karabiber.
+- Tarif gerçekçi, uygulanabilir ve kısa olsun.
+- 5 veya daha fazla kısa adım yaz.
+- Adımlar satır satır okunabilir olsun.
+- variation arttıkça tarif gerçekten değişsin. Aynı tarifi tekrar etme.
+- "calories" alanında yaklaşık toplam kalori ver. Örn: "420 kcal"
+- "healthScore" alanında 1 ile 10 arasında sağlık puanı ver. Ondalıklı olabilir. Örn: 8.4
+- "protein" alanında yaklaşık protein ver. Örn: "22 g"
+- "carbs" alanında yaklaşık karbonhidrat ver. Örn: "30 g"
+- "fat" alanında yaklaşık yağ ver. Örn: "18 g"
+- "duration" alanında toplam süre ver. Örn: "20 dk"
+- "difficulty" alanında sadece şu değerlerden birini ver: "Kolay", "Orta", "Zor"
+- "summary" kısa olsun.
+- SADECE geçerli JSON döndür. Açıklama, markdown, kod bloğu yok.
 
 Şema:
 {
- "title": "string",
- "summary": "string",
- "ingredients": ["string"],
- "steps": ["string"]
+  "title": "string",
+  "summary": "string",
+  "ingredients": ["string"],
+  "steps": ["string"],
+  "calories": "string",
+  "healthScore": 8.4,
+  "protein": "string",
+  "carbs": "string",
+  "fat": "string",
+  "duration": "string",
+  "difficulty": "Kolay | Orta | Zor"
 }
-
-Not: variation arttıkça tarifi GERÇEKTEN değiştir.
 `.trim();
 
     const payload = {
@@ -79,10 +97,35 @@ Not: variation arttıkça tarifi GERÇEKTEN değiştir.
             properties: {
               title: { type: "string" },
               summary: { type: "string" },
-              ingredients: { type: "array", items: { type: "string" } },
-              steps: { type: "array", items: { type: "string" } },
+              ingredients: {
+                type: "array",
+                items: { type: "string" },
+              },
+              steps: {
+                type: "array",
+                items: { type: "string" },
+              },
+              calories: { type: "string" },
+              healthScore: { type: "number" },
+              protein: { type: "string" },
+              carbs: { type: "string" },
+              fat: { type: "string" },
+              duration: { type: "string" },
+              difficulty: { type: "string" },
             },
-            required: ["title", "summary", "ingredients", "steps"],
+            required: [
+              "title",
+              "summary",
+              "ingredients",
+              "steps",
+              "calories",
+              "healthScore",
+              "protein",
+              "carbs",
+              "fat",
+              "duration",
+              "difficulty",
+            ],
           },
           strict: true,
         },
@@ -98,7 +141,9 @@ Not: variation arttıkça tarifi GERÇEKTEN değiştir.
       body: JSON.stringify(payload),
     });
 
-    const raw = await resp.json().catch(async () => ({ _raw: await resp.text().catch(() => "") }));
+    const raw = await resp.json().catch(async () => ({
+      _raw: await resp.text().catch(() => ""),
+    }));
 
     if (!resp.ok) {
       return NextResponse.json(
@@ -110,28 +155,35 @@ Not: variation arttıkça tarifi GERÇEKTEN değiştir.
     const outText = extractOutputText(raw);
 
     if (!outText) {
-      // ✅ Debug için kısa kesilmiş response
       return NextResponse.json(
         { error: "Model boş çıktı döndü", detail: JSON.stringify(raw).slice(0, 2000) },
         { status: 500 }
       );
     }
 
-    // ✅ JSON parse (normalde strict schema ile direkt JSON gelir)
     let data: any = null;
     try {
       data = JSON.parse(outText);
     } catch {
-      // son çare: içindeki JSON bloğunu yakala
       const m = outText.match(/\{[\s\S]*\}/);
       if (m?.[0]) data = JSON.parse(m[0]);
     }
 
-    // ✅ Boş tarif dönmesin
     const title = String(data?.title || "Cin Şef Tarifi");
     const summary = String(data?.summary || "");
     const ingredients = Array.isArray(data?.ingredients) ? data.ingredients : [];
     const steps = Array.isArray(data?.steps) ? data.steps : [];
+
+    const calories = String(data?.calories || "-");
+    const healthScore =
+      typeof data?.healthScore === "number" && Number.isFinite(data.healthScore)
+        ? data.healthScore
+        : 0;
+    const protein = String(data?.protein || "-");
+    const carbs = String(data?.carbs || "-");
+    const fat = String(data?.fat || "-");
+    const duration = String(data?.duration || "-");
+    const difficulty = String(data?.difficulty || "-");
 
     if (!steps.length) {
       return NextResponse.json(
@@ -140,7 +192,22 @@ Not: variation arttıkça tarifi GERÇEKTEN değiştir.
       );
     }
 
-    return NextResponse.json({ title, summary, ingredients, steps }, { status: 200 });
+    return NextResponse.json(
+      {
+        title,
+        summary,
+        ingredients,
+        steps,
+        calories,
+        healthScore,
+        protein,
+        carbs,
+        fat,
+        duration,
+        difficulty,
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json(
       { error: "recipe route crash", detail: String(e?.message || e) },

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(", ");
 
-const prompt = `
+    const prompt = `
 Sen premium bir "Cin Şef Barmen"sin.
 
 Kullanıcının elindeki içecekler:
@@ -54,28 +54,38 @@ Güç seviyesi: ${alcoholLevel}
 Alternatif sayacı: ${variation}
 
 KURALLAR:
+- ÇIKTI DİLİ: Türkçe zorunlu. İngilizce kelime kullanma.
 - Sadece listede olanları kullan.
 - Tahmin yapma.
 - Alkolsüz üretme.
 - Ölçü şart: her malzeme için ml veya cl yaz.
 - Toplam hacim 150–250 ml arası olsun.
 - Buz varsa "2-3 küp buz" yaz.
-- Adımlar kısa ve net olsun, "kaç saniye karıştır/çalkala" mutlaka belirt.
-- En az 3 malzeme ve 3 adım yaz (premium için).
-
-JSON dışında hiçbir şey yazma.
+- Adımlar kısa ve net olsun.
+- "kaç saniye karıştır / çalkala" mutlaka belirt.
+- En az 3 malzeme ve 3 adım yaz.
+- Variation arttıkça gerçekten farklı öneri üret.
+- "strength" alanı sadece şu değerlerden biri olsun: "hafif", "orta", "sert"
+- "score" alanı 0-100 arası sayı olsun.
+- "abv" alanında tahmini alkol oranı ver. Örn: "%14"
+- "tasteProfile" alanında kısa tat profili ver. Örn: "Bitkisel, narenciye, ferah"
+- "drinkingStyle" alanında kısa içim tipi ver. Örn: "Uzun içim", "Dengeli", "Sert içim", "Ferah"
+- JSON dışında hiçbir şey yazma.
 
 ŞEMA:
 {
-  "title": string,
-  "summary": string,
+  "title": "string",
+  "summary": "string",
   "strength": "hafif"|"orta"|"sert",
   "score": number,
-  "ingredients": string[],  // örn: "Jägermeister 50 ml"
-  "steps": string[],        // örn: "Bardağa buz koy, 10 sn karıştır"
-  "tips": string[]
+  "abv": "string",
+  "tasteProfile": "string",
+  "drinkingStyle": "string",
+  "ingredients": ["string"],
+  "steps": ["string"],
+  "tips": ["string"]
 }
-`;
+`.trim();
 
     const payload = {
       model: "gpt-4.1-mini",
@@ -100,6 +110,9 @@ JSON dışında hiçbir şey yazma.
                 enum: ["hafif", "orta", "sert"],
               },
               score: { type: "number" },
+              abv: { type: "string" },
+              tasteProfile: { type: "string" },
+              drinkingStyle: { type: "string" },
               ingredients: {
                 type: "array",
                 items: { type: "string" },
@@ -118,6 +131,9 @@ JSON dışında hiçbir şey yazma.
               "summary",
               "strength",
               "score",
+              "abv",
+              "tasteProfile",
+              "drinkingStyle",
               "ingredients",
               "steps",
               "tips",
@@ -173,10 +189,17 @@ JSON dışında hiçbir şey yazma.
     const title = String(data?.title || "Cin Şef Karışımı");
     const summary = String(data?.summary || "");
     const strength =
-      (data?.strength as AlcoholLevel) || alcoholLevel;
+      data?.strength === "hafif" || data?.strength === "orta" || data?.strength === "sert"
+        ? (data.strength as AlcoholLevel)
+        : alcoholLevel;
+
     const score = Number.isFinite(data?.score)
       ? Number(data.score)
       : 70;
+
+    const abv = String(data?.abv || "%12");
+    const tasteProfile = String(data?.tasteProfile || "Dengeli");
+    const drinkingStyle = String(data?.drinkingStyle || "Dengeli");
 
     const ingredients = safeArr(data?.ingredients);
     const steps = safeArr(data?.steps);
@@ -190,6 +213,9 @@ JSON dışında hiçbir şey yazma.
           "Karışım için en az 1 içki + 1 mixer gerekir. Manual ekle: buz + limon + soda/tonik/kola.",
         strength,
         score: 55,
+        abv: "%0-5",
+        tasteProfile: "Eksik içerik",
+        drinkingStyle: "Tamamlanmamış",
         ingredients: [
           "(Eksik) buz",
           "(Eksik) limon/lime",
@@ -208,6 +234,9 @@ JSON dışında hiçbir şey yazma.
       summary,
       strength,
       score,
+      abv,
+      tasteProfile,
+      drinkingStyle,
       ingredients,
       steps,
       tips,
