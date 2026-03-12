@@ -101,7 +101,7 @@ function GenieBackground() {
       <img
         src="/genie-bg.png"
         alt="Genie background"
-   className="h-full w-full object-cover object-[22%_center] sm:object-center"
+        className="h-full w-full object-cover object-[22%_center] sm:object-center"
         draggable={false}
       />
       <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
@@ -339,6 +339,8 @@ export default function FridgeChefApp() {
   const [manualInput, setManualInput] = useState("");
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImageGenerating, setIsImageGenerating] = useState(false);
+  const [dishImageUrl, setDishImageUrl] = useState("");
   const [error, setError] = useState("");
   const [tryIndex, setTryIndex] = useState(0);
 
@@ -356,13 +358,15 @@ export default function FridgeChefApp() {
   const [isPaused, setIsPaused] = useState(false);
 
   const [lastSpokenText, setLastSpokenText] = useState<string>("");
-
   const [cinAction, setCinAction] = useState<"fast" | "fit" | "new" | null>(null);
 
   const lastSpokenScreenRef = useRef<Screen | null>(null);
   const idleTimerRef = useRef<any>(null);
 
   const canTTS = typeof window !== "undefined" && "speechSynthesis" in window;
+  const isMobile =
+    typeof window !== "undefined" &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const finalItems = useMemo(() => {
     const all = [...selectedNames, ...manualItems].map(normalize).filter(Boolean);
@@ -371,7 +375,9 @@ export default function FridgeChefApp() {
 
   const safeSteps = useMemo(() => {
     const steps = screen === "cocktail" ? cocktail?.steps : recipe?.steps;
-    return (Array.isArray(steps) ? steps : []).map((x) => String(x || "").trim()).filter(Boolean);
+    return (Array.isArray(steps) ? steps : [])
+      .map((x) => String(x || "").trim())
+      .filter(Boolean);
   }, [screen, recipe, cocktail]);
 
   const activeStepText = safeSteps[stepIndex] || safeSteps[0] || "";
@@ -387,14 +393,45 @@ export default function FridgeChefApp() {
   function pickMaleVoice(list: SpeechSynthesisVoice[]) {
     const tr = list.filter((v) => (v.lang || "").toLowerCase().startsWith("tr"));
     const pool = tr.length ? tr : list;
-
     const maleHints = ["male", "man", "erkek", "tolga", "mehmet", "ali", "kemal", "mert"];
+
     return (
       pool.find((v) => maleHints.some((h) => v.name.toLowerCase().includes(h))) ||
       pool.find((v) => maleHints.some((h) => (v.voiceURI || "").toLowerCase().includes(h))) ||
       pool[0] ||
       null
     );
+  }
+
+  async function generateDishImage(params: {
+    mode: "recipe" | "cocktail";
+    title: string;
+    summary: string;
+    ingredients: string[];
+  }) {
+    try {
+      setIsImageGenerating(true);
+      setDishImageUrl("");
+
+      const res = await fetch("/api/dish-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const data = await res.json();
+      setDishImageUrl(data?.imageUrl || "");
+    } catch (err) {
+      console.error("Görsel üretilemedi:", err);
+    } finally {
+      setIsImageGenerating(false);
+    }
   }
 
   function stopSpeaking() {
@@ -484,6 +521,7 @@ export default function FridgeChefApp() {
       if (next < steps.length) setTimeout(() => speakStepAt(next), 300);
       else setTtsMode("off");
     };
+
     u.onerror = () => {
       setIsSpeaking(false);
       setIsPaused(false);
@@ -579,6 +617,8 @@ export default function FridgeChefApp() {
     setManualItems([]);
     setManualInput("");
     setIsGenerating(false);
+    setIsImageGenerating(false);
+    setDishImageUrl("");
     setTryIndex(0);
     setRecipe(null);
     setCocktail(null);
@@ -601,6 +641,7 @@ export default function FridgeChefApp() {
     setError("");
     setRecipe(null);
     setCocktail(null);
+    setDishImageUrl("");
     stopSpeaking();
 
     setScanDone(false);
@@ -688,6 +729,7 @@ export default function FridgeChefApp() {
     setError("");
     setRecipe(null);
     setCocktail(null);
+    setDishImageUrl("");
     stopSpeaking();
 
     if (!imageFile) {
@@ -715,7 +757,10 @@ export default function FridgeChefApp() {
 
       if (type === "food") {
         const list: VisionFoodItem[] = items
-          .map((x: any) => ({ name: normalize(x?.name), confidence: Number(x?.confidence ?? 0) }))
+          .map((x: any) => ({
+            name: normalize(x?.name),
+            confidence: Number(x?.confidence ?? 0),
+          }))
           .filter((x: any) => x.name);
 
         setVisionFood(list);
@@ -749,6 +794,7 @@ export default function FridgeChefApp() {
   async function generateRecipe(nextTry?: number) {
     setError("");
     setRecipe(null);
+    setDishImageUrl("");
     stopSpeaking();
 
     if (!finalItems.length) {
@@ -776,6 +822,14 @@ export default function FridgeChefApp() {
       setRecipe(data);
       setTtsMode("off");
       setStepIndex(0);
+
+      generateDishImage({
+        mode: "recipe",
+        title: data.title,
+        summary: data.summary,
+        ingredients: data.ingredients || [],
+      });
+
       speak("Tarif hazır. Beğenmezsen yeni bir numara daha yaparım 😏");
     } catch (e: any) {
       setError(e?.message || "Tarif üretilemedi");
@@ -789,6 +843,7 @@ export default function FridgeChefApp() {
   async function generateCocktail(nextTry?: number) {
     setError("");
     setCocktail(null);
+    setDishImageUrl("");
     stopSpeaking();
 
     const selectedDrinkObjects = visionDrinks
@@ -832,6 +887,14 @@ export default function FridgeChefApp() {
       setCocktail(data);
       setTtsMode("off");
       setStepIndex(0);
+
+      generateDishImage({
+        mode: "cocktail",
+        title: data.title,
+        summary: data.summary,
+        ingredients: data.ingredients || [],
+      });
+
       speak("Karışım hazır. Beğenmezsen başka bir havaya gireriz 😏");
     } catch (e: any) {
       setError(e?.message || "Kokteyl üretilemedi");
@@ -1055,20 +1118,21 @@ export default function FridgeChefApp() {
           </div>
         )}
       </div>
-<input
-  ref={fileRef}
-  type="file"
-  accept="image/*"
-  capture="environment"
-  className="hidden"
-  onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-/>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture={isMobile ? "environment" : undefined}
+        className="hidden"
+        onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+      />
 
       <button
         onClick={() => fileRef.current?.click()}
         className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
       >
-        Fotoğraf seç
+        Kamera / Fotoğraf Aç
       </button>
 
       <button
@@ -1145,6 +1209,22 @@ export default function FridgeChefApp() {
 
     return (
       <div className={`mt-5 p-5 ${glassPanel}`}>
+        {isImageGenerating && (
+          <div className="mb-4 rounded-3xl border border-black/10 bg-white/80 px-4 py-10 text-center text-sm font-bold text-slate-600">
+            AI sunum görseli hazırlanıyor…
+          </div>
+        )}
+
+        {dishImageUrl && (
+          <div className="mb-4 overflow-hidden rounded-3xl border border-white/50 bg-white/80 shadow-[0_10px_28px_rgba(15,23,42,0.10)]">
+            <img
+              src={dishImageUrl}
+              alt="AI sunum görseli"
+              className="h-64 w-full object-cover"
+            />
+          </div>
+        )}
+
         <div className="rounded-3xl bg-gradient-to-r from-[#fff7e8] to-white p-4">
           <div className="text-[22px] font-black tracking-tight text-[#111827]">{data.title}</div>
           <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{data.summary}</div>
@@ -1191,12 +1271,29 @@ export default function FridgeChefApp() {
 
         <button
           onClick={() => {
+            const d = screen === "cocktail" ? cocktail : recipe;
+            if (!d) return;
+
+            generateDishImage({
+              mode: screen === "cocktail" ? "cocktail" : "recipe",
+              title: d.title,
+              summary: d.summary,
+              ingredients: d.ingredients || [],
+            });
+          }}
+          className="mt-4 w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-black text-[#111827]"
+        >
+          🖼️ Görseli yenile
+        </button>
+
+        <button
+          onClick={() => {
             const next = tryIndex + 1;
             setTryIndex(next);
             if (screen === "cocktail") generateCocktail(next);
             else generateRecipe(next);
           }}
-          className="mt-4 w-full rounded-2xl border border-black/15 bg-slate-100 px-4 py-3 text-sm font-black text-[#111827]"
+          className="mt-3 w-full rounded-2xl border border-black/15 bg-slate-100 px-4 py-3 text-sm font-black text-[#111827]"
         >
           😤 Beğenmedim → yeni öner
         </button>
