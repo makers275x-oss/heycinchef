@@ -101,7 +101,7 @@ function GenieBackground() {
       <img
         src="/genie-bg.png"
         alt="Genie background"
-        className="h-full w-full object-cover"
+   className="h-full w-full object-cover object-[22%_center] sm:object-center"
         draggable={false}
       />
       <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
