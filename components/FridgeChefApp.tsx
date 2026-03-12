@@ -185,13 +185,12 @@ function ChefCin({
         if (e.key === "Enter" || e.key === " ") onClick?.();
       }}
       className="select-none cursor-pointer"
-      style={{ background: "transparent" }}
       aria-label="Chef Cin"
     >
-      <div className="pointer-events-auto mb-2 mr-auto w-max max-w-[290px] rounded-[26px] border border-white/50 bg-white/92 px-4 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
-        <div className="line-clamp-2">{bubble || "Hazırım 😎"}</div>
+      <div className="pointer-events-auto mb-2 mr-0 ml-auto w-[230px] sm:w-[290px] rounded-[22px] border border-white/50 bg-white/92 px-3 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
+        <div className="line-clamp-2 text-[13px] sm:text-sm">{bubble || "Hazırım 😎"}</div>
 
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={(e) => {
@@ -232,7 +231,7 @@ function ChefCin({
         <div className="mt-2 text-[11px] font-semibold text-slate-600">{hint}</div>
       </div>
 
-      <svg width="150" height="190" viewBox="0 0 150 170" className="drop-shadow-xl">
+      <svg width="118" height="150" viewBox="0 0 150 170" className="ml-auto drop-shadow-xl sm:h-[190px] sm:w-[150px]">
         <ellipse cx="78" cy="160" rx="42" ry="9" fill="rgba(0,0,0,0.15)" />
 
         <g>
@@ -508,7 +507,7 @@ export default function FridgeChefApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, voices.length]);
 
-  function resetIdleTimer(reason?: string) {
+  function resetIdleTimer() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
     idleTimerRef.current = setTimeout(() => {
@@ -527,15 +526,14 @@ export default function FridgeChefApp() {
 
   useEffect(() => {
     const events: Array<keyof WindowEventMap> = ["mousemove", "click", "touchstart", "keydown", "scroll"];
-    const handler = () => resetIdleTimer("user");
+    const handler = () => resetIdleTimer();
     events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
-    resetIdleTimer("mount");
+    resetIdleTimer();
 
     return () => {
       events.forEach((e) => window.removeEventListener(e, handler));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, isScanning, isGenerating]);
 
   function resetAll() {
@@ -559,7 +557,7 @@ export default function FridgeChefApp() {
       return "";
     });
     if (fileRef.current) fileRef.current.value = "";
-    resetIdleTimer("resetAll");
+    resetIdleTimer();
   }
 
   function goHome() {
@@ -587,7 +585,7 @@ export default function FridgeChefApp() {
       return file ? URL.createObjectURL(file) : "";
     });
 
-    resetIdleTimer("pickFile");
+    resetIdleTimer();
     speak(file ? "Foto geldi 😎 Tara butonuna bas." : "Foto yok… seçelim 😄");
   }
 
@@ -596,7 +594,7 @@ export default function FridgeChefApp() {
     setSelectedNames((prev) =>
       prev.some((x) => normalize(x) === n) ? prev.filter((x) => normalize(x) !== n) : [...prev, n]
     );
-    resetIdleTimer("toggleSelected");
+    resetIdleTimer();
   }
 
   function addManual() {
@@ -643,7 +641,7 @@ export default function FridgeChefApp() {
     });
 
     setManualInput("");
-    resetIdleTimer("addManual");
+    resetIdleTimer();
     speak("Manual eklendi 😎");
   }
 
@@ -651,7 +649,7 @@ export default function FridgeChefApp() {
     const v = normalize(it);
     setManualItems((prev) => prev.filter((x) => normalize(x) !== v));
     setSelectedNames((prev) => prev.filter((x) => normalize(x) !== v));
-    resetIdleTimer("removeManual");
+    resetIdleTimer();
   }
 
   async function scanImage() {
@@ -669,7 +667,7 @@ export default function FridgeChefApp() {
     const type = screen === "cocktail" ? "drinks" : "food";
 
     setIsScanning(true);
-    resetIdleTimer("scanStart");
+    resetIdleTimer();
     speak(type === "food" ? "Dolabı tarıyorum… 👀" : "Etiketi okuyorum… 👀");
 
     try {
@@ -707,7 +705,7 @@ export default function FridgeChefApp() {
 
       setScanDone(true);
       setTryIndex(0);
-      resetIdleTimer("scanDone");
+      resetIdleTimer();
     } catch (e: any) {
       setError(e?.message || "Tarama hatası");
       speak("Tarama patladı… bi daha dene 😅");
@@ -730,7 +728,7 @@ export default function FridgeChefApp() {
     const v = typeof nextTry === "number" ? nextTry : tryIndex;
 
     setIsGenerating(true);
-    resetIdleTimer("genRecipeStart");
+    resetIdleTimer();
     speak("Tarif yazıyorum… şef modu 😎");
 
     try {
@@ -752,7 +750,7 @@ export default function FridgeChefApp() {
       speak("Tarif çıkmadı… bir daha deneriz 😅");
     } finally {
       setIsGenerating(false);
-      resetIdleTimer("genRecipeDone");
+      resetIdleTimer();
     }
   }
 
@@ -782,7 +780,7 @@ export default function FridgeChefApp() {
     const v = typeof nextTry === "number" ? nextTry : tryIndex;
 
     setIsGenerating(true);
-    resetIdleTimer("genCocktailStart");
+    resetIdleTimer();
     speak("Karışım ayarlıyorum… barmen mod 😎");
 
     try {
@@ -808,7 +806,7 @@ export default function FridgeChefApp() {
       speak("Kokteyl çıkmadı… bi daha deneriz 😅");
     } finally {
       setIsGenerating(false);
-      resetIdleTimer("genCocktailDone");
+      resetIdleTimer();
     }
   }
 
@@ -820,7 +818,7 @@ export default function FridgeChefApp() {
 
     const next = tryIndex + 11;
     setTryIndex(next);
-    resetIdleTimer("actionFast");
+    resetIdleTimer();
 
     setTimeout(() => {
       if (screen === "recipe") generateRecipe(next);
@@ -836,7 +834,7 @@ export default function FridgeChefApp() {
 
     const next = tryIndex + 22;
     setTryIndex(next);
-    resetIdleTimer("actionFit");
+    resetIdleTimer();
 
     setTimeout(() => {
       if (screen === "recipe") generateRecipe(next);
@@ -852,7 +850,7 @@ export default function FridgeChefApp() {
 
     const next = tryIndex + 1;
     setTryIndex(next);
-    resetIdleTimer("actionNew");
+    resetIdleTimer();
 
     setTimeout(() => {
       if (screen === "recipe") generateRecipe(next);
@@ -882,7 +880,7 @@ export default function FridgeChefApp() {
           <div className="text-sm font-black text-[#111827]">Ses (Erkek)</div>
           <button
             onClick={() => {
-              resetIdleTimer("voiceTalk");
+              resetIdleTimer();
               speak("Ben hazırım. Devam de yeter 😄");
             }}
             className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
@@ -1126,7 +1124,7 @@ export default function FridgeChefApp() {
 
       <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
 
-      <div className="relative mx-auto w-full max-w-md px-4 pt-6 pb-28">
+      <div className="relative mx-auto w-full max-w-md px-4 pt-6 pb-[260px] sm:pb-[220px]">
         <div className="rounded-[34px] border border-amber-200/70 bg-[#fff8ee]/95 p-5 shadow-[0_18px_40px_rgba(245,158,11,0.18)] backdrop-blur-sm">
           <div className="text-[26px] font-black tracking-tight text-[#111827]">{homeTitle}</div>
           <div className="mt-1 text-[17px] font-black text-[#1f2937]">{homeSubtitle}</div>
@@ -1172,7 +1170,7 @@ export default function FridgeChefApp() {
                     <button
                       key={lvl}
                       onClick={() => {
-                        resetIdleTimer("alcohol");
+                        resetIdleTimer();
                         setAlcoholLevel(lvl);
                         speak(`Tamam 😎 Güç: ${lvl}`);
                       }}
@@ -1211,7 +1209,7 @@ export default function FridgeChefApp() {
 
                 <button
                   onClick={() => {
-                    resetIdleTimer("generateBtn");
+                    resetIdleTimer();
                     if (screen === "recipe") generateRecipe();
                     else generateCocktail();
                   }}
@@ -1238,14 +1236,14 @@ export default function FridgeChefApp() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 right-4 z-50">
+      <div className="fixed bottom-3 right-3 z-50 sm:bottom-6 sm:right-4">
         <ChefCin
           mode={chefMode}
           bubble={lastSpokenText}
           screen={screen}
           cinAction={cinAction}
           onClick={() => {
-            resetIdleTimer("cinClick");
+            resetIdleTimer();
             speak("Hadi canım… foto ver de büyüyü yapayım 😎");
           }}
           onFast={actionFast}
