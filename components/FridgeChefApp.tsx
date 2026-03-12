@@ -53,6 +53,62 @@ function aiLine(screen: Screen) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function getStepBadge(step: string, screen: Screen) {
+  const s = String(step || "").toLowerCase();
+
+  if (screen === "cocktail") {
+    if (s.includes("buz")) return "🧊";
+    if (s.includes("çalkala") || s.includes("shake")) return "🍸";
+    if (s.includes("dök") || s.includes("bardağa")) return "🥃";
+    if (s.includes("karıştır")) return "🥄";
+    if (s.includes("limon") || s.includes("lime")) return "🍋";
+    return "✨";
+  }
+
+  if (s.includes("doğra") || s.includes("kes")) return "🔪";
+  if (s.includes("karıştır")) return "🥣";
+  if (s.includes("kızart") || s.includes("sotele")) return "🔥";
+  if (s.includes("haşla") || s.includes("kaynat")) return "♨️";
+  if (s.includes("fırın") || s.includes("pişir")) return "🍳";
+  if (s.includes("servis")) return "🍽️";
+  return "✨";
+}
+
+function getStepComment(step: string, screen: Screen) {
+  const s = String(step || "").toLowerCase();
+
+  if (screen === "cocktail") {
+    if (s.includes("buz")) return "Cin diyor: Soğuk olursa karizma artar.";
+    if (s.includes("çalkala") || s.includes("shake")) return "Cin diyor: Bilekten çalış, artistlik serbest.";
+    if (s.includes("dök")) return "Cin diyor: Taşırma, bardağın da gururu var.";
+    if (s.includes("limon") || s.includes("lime")) return "Cin diyor: Ekşilik dengedir.";
+    if (s.includes("karıştır")) return "Cin diyor: Yavaş ve havalı karıştır.";
+    return "Cin diyor: Bu bardak birazdan efsane olacak.";
+  }
+
+  if (s.includes("doğra") || s.includes("kes")) return "Cin diyor: Parmaklar kalsın, sebze gitsin.";
+  if (s.includes("karıştır")) return "Cin diyor: Şef gibi karıştır, panik yok.";
+  if (s.includes("kızart") || s.includes("sotele")) return "Cin diyor: Yakma da efsane olsun.";
+  if (s.includes("haşla") || s.includes("kaynat")) return "Cin diyor: Sabır da malzeme sayılır.";
+  if (s.includes("fırın") || s.includes("pişir")) return "Cin diyor: Koku geldi mi iş tamam.";
+  if (s.includes("servis")) return "Cin diyor: Şimdi biraz hava atabilirsin.";
+  return "Cin diyor: Devam et, mutfakta büyü var.";
+}
+
+function GenieBackground() {
+  return (
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+      <img
+        src="/genie-bg.png"
+        alt="Genie background"
+        className="h-full w-full object-cover"
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
+    </div>
+  );
+}
+
 const glassPanel =
   "rounded-[28px] border border-white/50 bg-white/88 backdrop-blur-md shadow-[0_10px_32px_rgba(15,23,42,0.12)]";
 const glassPanelSoft =
@@ -111,7 +167,7 @@ const ManualPanel = React.memo(function ManualPanel(props: {
         <button
           type="button"
           onClick={props.addManual}
-          className="rounded-2xl bg-black px-4 py-3 font-extrabold text-white shadow-sm transition active:scale-[0.98]"
+          className="rounded-2xl bg-black px-4 py-3 font-extrabold text-white shadow-sm"
         >
           Ekle
         </button>
@@ -187,7 +243,7 @@ function ChefCin({
       className="select-none cursor-pointer"
       aria-label="Chef Cin"
     >
-      <div className="pointer-events-auto mb-2 mr-0 ml-auto w-[230px] sm:w-[290px] rounded-[22px] border border-white/50 bg-white/92 px-3 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
+      <div className="pointer-events-auto mb-2 ml-auto w-[230px] sm:w-[290px] rounded-[22px] border border-white/50 bg-white/92 px-3 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
         <div className="line-clamp-2 text-[13px] sm:text-sm">{bubble || "Hazırım 😎"}</div>
 
         <div className="mt-2 flex flex-wrap gap-2">
@@ -198,7 +254,6 @@ function ChefCin({
               onFast?.();
             }}
             className={`${btnBase} ${fastActive ? btnOn : btnOff}`}
-            title={screen === "cocktail" ? "Daha kolay karışım" : "Daha kısa tarif"}
           >
             ⚡ {fastLabel} {fastActive ? "✓" : ""}
           </button>
@@ -210,7 +265,6 @@ function ChefCin({
               onFit?.();
             }}
             className={`${btnBase} ${fitActive ? btnOn : btnOff}`}
-            title={screen === "cocktail" ? "Uzun içim / ferah" : "Daha hafif tarif"}
           >
             🧊 {fitLabel} {fitActive ? "✓" : ""}
           </button>
@@ -222,7 +276,6 @@ function ChefCin({
               onNew?.();
             }}
             className={`${btnBase} ${newActive ? btnOn : btnOff}`}
-            title="Farklı öneri"
           >
             🎲 Yeni {newActive ? "✓" : ""}
           </button>
@@ -233,16 +286,7 @@ function ChefCin({
 
       <svg width="118" height="150" viewBox="0 0 150 170" className="ml-auto drop-shadow-xl sm:h-[190px] sm:w-[150px]">
         <ellipse cx="78" cy="160" rx="42" ry="9" fill="rgba(0,0,0,0.15)" />
-
         <g>
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0; 0 -7; 0 0"
-            dur="2.4s"
-            repeatCount="indefinite"
-          />
-
           <path
             d="M78 140 C55 145, 52 125, 62 115 C48 105, 58 92, 72 98 C72 82, 96 82, 96 98 C112 90, 120 106, 104 116 C116 126, 104 148, 78 140 Z"
             fill="#3BA7FF"
@@ -252,11 +296,9 @@ function ChefCin({
             d="M52 120 C46 92, 58 64, 78 62 C98 64, 110 92, 104 120 C95 140, 61 140, 52 120 Z"
             fill="#1E90FF"
           />
-
           <circle cx="78" cy="78" r="28" fill="#7CC7FF" />
           <circle cx="70" cy="76" r="4" fill="#0B1B2B" />
           <circle cx="90" cy="76" r="4" fill="#0B1B2B" />
-
           {mode === "talk" ? (
             <path d="M88 108 Q96 116 104 108" stroke="#0B1B2B" strokeWidth="3" strokeLinecap="round" />
           ) : mode === "cook" ? (
@@ -264,26 +306,12 @@ function ChefCin({
           ) : (
             <path d="M88 108 Q96 110 104 108" stroke="#0B1B2B" strokeWidth="3" strokeLinecap="round" />
           )}
-
           <path
             d="M60 52 C58 40, 66 34, 74 38 C76 30, 88 30, 90 38 C98 34, 106 40, 104 52 C92 58, 72 58, 60 52 Z"
             fill="#FFFFFF"
             stroke="rgba(0,0,0,0.15)"
           />
           <rect x="62" y="50" width="44" height="10" rx="5" fill="#F3F3F3" stroke="rgba(0,0,0,0.12)" />
-
-          {mode === "scan" && (
-            <g>
-              <circle cx="118" cy="92" r="12" stroke="#0B1B2B" strokeWidth="4" fill="rgba(255,255,255,0.35)" />
-              <path d="M126 100 L138 112" stroke="#0B1B2B" strokeWidth="5" strokeLinecap="round" />
-            </g>
-          )}
-          {mode === "cook" && (
-            <g>
-              <path d="M118 88 C110 86, 110 98, 118 96" stroke="#0B1B2B" strokeWidth="4" strokeLinecap="round" />
-              <path d="M118 96 L140 118" stroke="#0B1B2B" strokeWidth="5" strokeLinecap="round" />
-            </g>
-          )}
         </g>
       </svg>
     </div>
@@ -293,9 +321,9 @@ function ChefCin({
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
-  const [homeTitle] = useState("Lamba hazır...");
-  const [homeSubtitle] = useState("Cin Asistan burada 😄");
-  const [homeLine] = useState("Tarif mi, kokteyl mi? Foto çek, ben büyüyü yapayım 👀");
+  const [homeTitle] = useState("🪔 Cin Şef");
+  const [homeSubtitle] = useState("Tarif hiç bu kadar eğlenceli olmamıştı.");
+  const [homeLine] = useState("Dolabı ya da şişeleri göster. Cin sana tarif büyüsü yapsın.");
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -345,6 +373,10 @@ export default function FridgeChefApp() {
     const steps = screen === "cocktail" ? cocktail?.steps : recipe?.steps;
     return (Array.isArray(steps) ? steps : []).map((x) => String(x || "").trim()).filter(Boolean);
   }, [screen, recipe, cocktail]);
+
+  const activeStepText = safeSteps[stepIndex] || safeSteps[0] || "";
+  const activeStepBadge = getStepBadge(activeStepText, screen);
+  const activeStepComment = getStepComment(activeStepText, screen);
 
   function ensureSynth() {
     if (typeof window === "undefined") return null;
@@ -449,7 +481,7 @@ export default function FridgeChefApp() {
       setIsSpeaking(false);
       setIsPaused(false);
       const next = idx + 1;
-      if (next < steps.length) setTimeout(() => speakStepAt(next), 250);
+      if (next < steps.length) setTimeout(() => speakStepAt(next), 300);
       else setTtsMode("off");
     };
     u.onerror = () => {
@@ -466,10 +498,10 @@ export default function FridgeChefApp() {
 
   function startPremium() {
     if (!safeSteps.length) {
-      speak("Önce tarif/karışım üret 😄");
+      speak("Önce tarif ya da karışım üret 😄");
       return;
     }
-    speak("Premium okuma başlıyor. Satır satır 😎");
+    speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
     setTimeout(() => speakStepAt(0), 600);
   }
 
@@ -515,10 +547,10 @@ export default function FridgeChefApp() {
 
       const idleLines =
         screen === "home"
-          ? ["Bir şeye tıklasana 😄", "Tarif mi kokteyl mi? Ben buradayım 😎", "Hadi canım… büyü bekliyor 😏"]
+          ? ["Bir şeye bas da büyü başlasın 😄", "Tarif mi kokteyl mi? Ben hazırım 😎", "Dolabı konuşturalım mı? 😏"]
           : screen === "recipe"
-          ? ["Foto yükle de tarif patlatalım 😄", "Dolap sessiz… sen konuş 😎", "Bir hamle yap, ben şefim 🧞"]
-          : ["Etiketi tara… barmen cin bekliyor 😎", "Bir şey karıştıralım mı? 😏", "Hadi canım… bar hazır 🧞"];
+          ? ["Foto yükle, mutfakta şov yapalım 😄", "Dolap sessiz… ama ben değilim 😎", "Hadi şef, sıra sende 🧞"]
+          : ["Bar hazır 😎", "Şişeleri göster, karışımı uçuralım 😏", "Bir barmenlik görelim 🧞"];
 
       speak(idleLines[Math.floor(Math.random() * idleLines.length)], true);
     }, 12000);
@@ -586,7 +618,7 @@ export default function FridgeChefApp() {
     });
 
     resetIdleTimer();
-    speak(file ? "Foto geldi 😎 Tara butonuna bas." : "Foto yok… seçelim 😄");
+    speak(file ? "Foto geldi. Şimdi büyü zamanı 😎" : "Foto yok… önce onu halledelim 😄");
   }
 
   function toggleSelected(name: string) {
@@ -642,7 +674,7 @@ export default function FridgeChefApp() {
 
     setManualInput("");
     resetIdleTimer();
-    speak("Manual eklendi 😎");
+    speak("Manual malzeme eklendi. Güzel hamle 😎");
   }
 
   function removeManual(it: string) {
@@ -668,7 +700,7 @@ export default function FridgeChefApp() {
 
     setIsScanning(true);
     resetIdleTimer();
-    speak(type === "food" ? "Dolabı tarıyorum… 👀" : "Etiketi okuyorum… 👀");
+    speak(type === "food" ? "Dolabı tarıyorum… içindekiler saklanmasın 👀" : "Etiketleri okuyorum… kaçamazlar 👀");
 
     try {
       const fd = new FormData();
@@ -700,7 +732,7 @@ export default function FridgeChefApp() {
 
         setVisionDrinks(list);
         setSelectedNames(list.map((x) => normalize(x.name)));
-        speak(list.length ? "Etiketleri okudum. Bar hazır 😎" : "Etiket okunmuyor… daha net çek ya da manuel ekle 😄");
+        speak(list.length ? "Etiketleri okudum. Bar açıldı 😎" : "Etiket okunmuyor… daha net çek ya da manuel ekle 😄");
       }
 
       setScanDone(true);
@@ -708,7 +740,7 @@ export default function FridgeChefApp() {
       resetIdleTimer();
     } catch (e: any) {
       setError(e?.message || "Tarama hatası");
-      speak("Tarama patladı… bi daha dene 😅");
+      speak("Tarama biraz dramatik bitti… bir daha deneyelim 😅");
     } finally {
       setIsScanning(false);
     }
@@ -721,7 +753,7 @@ export default function FridgeChefApp() {
 
     if (!finalItems.length) {
       setError("En az 1 ürün seç 🧞");
-      speak("Ürün seçmeden tarif olmaz 😄");
+      speak("Ürün seçmeden tarif çıkmaz, büyü de çıkmaz 😄");
       return;
     }
 
@@ -729,7 +761,7 @@ export default function FridgeChefApp() {
 
     setIsGenerating(true);
     resetIdleTimer();
-    speak("Tarif yazıyorum… şef modu 😎");
+    speak("Tarif yazıyorum… mutfakta olay var 😎");
 
     try {
       const res = await fetch("/api/recipe", {
@@ -744,10 +776,10 @@ export default function FridgeChefApp() {
       setRecipe(data);
       setTtsMode("off");
       setStepIndex(0);
-      speak("Tarif hazır. Beğenmezsen yeni öner bas 😏");
+      speak("Tarif hazır. Beğenmezsen yeni bir numara daha yaparım 😏");
     } catch (e: any) {
       setError(e?.message || "Tarif üretilemedi");
-      speak("Tarif çıkmadı… bir daha deneriz 😅");
+      speak("Tarif çıkmadı… ama ben vazgeçmem 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -773,7 +805,7 @@ export default function FridgeChefApp() {
 
     if (payloadItems.length < 2 || mixerCount === 0) {
       setError("Tek başına içkiyle karışım zor 🧞‍♂️ Manual ekle: buz + limon + soda/tonik/kola.");
-      speak("Karışım için en az 1 mixer lazım: buz + limon + soda/tonik 😄");
+      speak("Karışım için biraz yardımcı lazım: buz, limon, soda gibi 😄");
       return;
     }
 
@@ -781,7 +813,7 @@ export default function FridgeChefApp() {
 
     setIsGenerating(true);
     resetIdleTimer();
-    speak("Karışım ayarlıyorum… barmen mod 😎");
+    speak("Karışımı ayarlıyorum… barmen tarafım uyandı 😎");
 
     try {
       const res = await fetch("/api/cocktail", {
@@ -800,10 +832,10 @@ export default function FridgeChefApp() {
       setCocktail(data);
       setTtsMode("off");
       setStepIndex(0);
-      speak("Karışım hazır. Beğenmezsen yeni öner bas 😏");
+      speak("Karışım hazır. Beğenmezsen başka bir havaya gireriz 😏");
     } catch (e: any) {
       setError(e?.message || "Kokteyl üretilemedi");
-      speak("Kokteyl çıkmadı… bi daha deneriz 😅");
+      speak("Kokteyl çıkmadı… ama sahneyi terk etmiyorum 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -814,7 +846,7 @@ export default function FridgeChefApp() {
     setCinAction("fast");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Pratik mod 😎 Daha kolay karışım." : "Hız moduna aldım 😎 Daha kısa tarif.");
+    speak(screen === "cocktail" ? "Pratik mod açıldı. Daha hızlı ve temiz 😎" : "Hız modu açıldı. Uzatmadan lezzet 😎");
 
     const next = tryIndex + 11;
     setTryIndex(next);
@@ -830,7 +862,7 @@ export default function FridgeChefApp() {
     setCinAction("fit");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Uzun içim 🧊 Daha ferah karışım." : "Fit mod 🥗 Daha hafif tarif.");
+    speak(screen === "cocktail" ? "Uzun içim modu. Daha ferah, daha havalı 🧊" : "Fit mod açıldı. Hafif ama iddialı 🥗");
 
     const next = tryIndex + 22;
     setTryIndex(next);
@@ -846,7 +878,7 @@ export default function FridgeChefApp() {
     setCinAction("new");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak("Yeni fikir geliyor 🎲");
+    speak("Yeni fikir geliyor. Bu sefer daha artistik olabilir 🎲");
 
     const next = tryIndex + 1;
     setTryIndex(next);
@@ -860,7 +892,12 @@ export default function FridgeChefApp() {
 
   const PageHeader = ({ title }: { title: string }) => (
     <div className="flex items-start justify-between gap-3">
-      <div className="text-[24px] font-black tracking-tight text-[#111827]">{title}</div>
+      <div>
+        <div className="text-[24px] font-black tracking-tight text-[#111827]">{title}</div>
+        <div className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+          {screen === "recipe" ? "Cin Şef mutfakta" : "Cin Şef barda"}
+        </div>
+      </div>
       <button
         onClick={goHome}
         className="rounded-2xl border border-black/15 bg-white/95 px-3 py-2 text-sm font-extrabold text-[#111827] shadow-sm"
@@ -881,7 +918,7 @@ export default function FridgeChefApp() {
           <button
             onClick={() => {
               resetIdleTimer();
-              speak("Ben hazırım. Devam de yeter 😄");
+              speak("Ben hazırım. Biraz şov, biraz tarif 😄");
             }}
             className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
           >
@@ -924,7 +961,10 @@ export default function FridgeChefApp() {
   const PremiumPanel = () => (
     <div className="mt-4 rounded-[24px] border border-amber-200/70 bg-gradient-to-br from-amber-50/95 to-white/95 p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-black text-[#111827]">Premium Okuma</div>
+        <div>
+          <div className="text-sm font-black text-[#111827]">Cin Şef Rehber Modu</div>
+          <div className="mt-1 text-xs font-semibold text-slate-600">Tarifi sana adım adım okur</div>
+        </div>
         <div className="text-xs font-extrabold text-slate-700">
           {safeSteps.length ? `${stepIndex + 1}/${safeSteps.length}` : "0/0"}
         </div>
@@ -932,7 +972,7 @@ export default function FridgeChefApp() {
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button onClick={startPremium} className="rounded-2xl bg-black px-3 py-3 text-sm font-black text-white">
-          Başla (Satır Satır)
+          Başla
         </button>
         <button
           onClick={stopSpeaking}
@@ -967,6 +1007,38 @@ export default function FridgeChefApp() {
     </div>
   );
 
+  const StepFunPanel = () => {
+    if (!safeSteps.length) return null;
+
+    return (
+      <div className="mt-4 overflow-hidden rounded-[24px] border border-white/45 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-md">
+        <div className="border-b border-black/5 bg-gradient-to-r from-amber-50 to-white px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-black uppercase tracking-wide text-slate-500">Adım ekranı</div>
+            <div className="rounded-full bg-black px-3 py-1 text-xs font-extrabold text-white">
+              Adım {Math.min(stepIndex + 1, safeSteps.length)} / {safeSteps.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
+              {activeStepBadge}
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-base font-black text-[#111827]">{activeStepText || "Adım bekleniyor"}</div>
+              <div className="mt-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm font-semibold leading-6 text-slate-700">
+                {activeStepComment}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const UploadPanel = ({ label, scanLabel }: { label: string; scanLabel: string }) => (
     <>
       <div className={`mt-4 p-5 text-center ${glassPanelSoft}`}>
@@ -994,7 +1066,7 @@ export default function FridgeChefApp() {
 
       <button
         onClick={() => fileRef.current?.click()}
-        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition active:scale-[0.98]"
+        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
       >
         Fotoğraf seç
       </button>
@@ -1013,7 +1085,11 @@ export default function FridgeChefApp() {
     if (screen === "recipe") {
       return (
         <div className={`mt-5 p-4 ${glassPanelSoft}`}>
-          <div className="text-base font-black text-[#111827]">Bulunan ürünler</div>
+          <div className="flex items-center justify-between">
+            <div className="text-base font-black text-[#111827]">Bulunan ürünler</div>
+            <div className="text-xs font-bold text-slate-500">Cin seçti, sen onayla</div>
+          </div>
+
           <div className="mt-3 grid grid-cols-2 gap-2">
             {visionFood.map((it) => {
               const checked = selectedNames.includes(normalize(it.name));
@@ -1034,7 +1110,11 @@ export default function FridgeChefApp() {
 
     return (
       <div className={`mt-5 p-4 ${glassPanelSoft}`}>
-        <div className="text-base font-black text-[#111827]">Bulunan içkiler</div>
+        <div className="flex items-center justify-between">
+          <div className="text-base font-black text-[#111827]">Bulunan içkiler</div>
+          <div className="text-xs font-bold text-slate-500">Okunan etiketler</div>
+        </div>
+
         <div className="mt-3 grid grid-cols-1 gap-2">
           {visionDrinks.map((it, idx) => {
             const key = `${it.name}-${idx}`;
@@ -1065,35 +1145,49 @@ export default function FridgeChefApp() {
 
     return (
       <div className={`mt-5 p-5 ${glassPanel}`}>
-        <div className="text-[22px] font-black tracking-tight text-[#111827]">{data.title}</div>
-        <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{data.summary}</div>
+        <div className="rounded-3xl bg-gradient-to-r from-[#fff7e8] to-white p-4">
+          <div className="text-[22px] font-black tracking-tight text-[#111827]">{data.title}</div>
+          <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{data.summary}</div>
+        </div>
 
         <PremiumPanel />
+        <StepFunPanel />
 
-        <div className="mt-5 text-sm font-black text-[#111827]">Malzemeler</div>
-        <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
-          {(data.ingredients || []).map((x, i) => (
-            <li key={i}>{x}</li>
-          ))}
-        </ul>
+        <div className="mt-5 rounded-3xl bg-slate-50/80 p-4">
+          <div className="text-sm font-black text-[#111827]">Malzemeler</div>
+          <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
+            {(data.ingredients || []).map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
+          </ul>
+        </div>
 
-        <div className="mt-5 text-sm font-black text-[#111827]">Adımlar</div>
-        <ol className="mt-2 list-decimal pl-5 text-sm font-semibold leading-6 text-slate-800">
-          {safeSteps.map((x, i) => {
-            const active = ttsMode === "steps" && i === stepIndex;
-            return (
-              <li
-                key={i}
-                className={
-                  "mt-2 rounded-xl px-2 py-1.5 transition " +
-                  (active ? "bg-black text-white shadow-sm" : "bg-transparent")
-                }
-              >
-                {x}
-              </li>
-            );
-          })}
-        </ol>
+        <div className="mt-4 rounded-3xl bg-white/70 p-4">
+          <div className="text-sm font-black text-[#111827]">Adımlar</div>
+          <ol className="mt-2 list-decimal pl-5 text-sm font-semibold leading-6 text-slate-800">
+            {safeSteps.map((x, i) => {
+              const active = ttsMode === "steps" && i === stepIndex;
+              return (
+                <li
+                  key={i}
+                  className={
+                    "mt-2 rounded-xl px-2 py-2 transition " +
+                    (active ? "bg-black text-white shadow-sm" : "bg-transparent")
+                  }
+                >
+                  <span className="mr-2">{getStepBadge(x, screen)}</span>
+                  {x}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          {screen === "cocktail"
+            ? "🧞 Cin notu: Bunu yapınca evin en havalı barmeni olabilirsin."
+            : "🧞 Cin notu: Bunu yapınca mutfakta gereksiz özgüven oluşabilir."}
+        </div>
 
         <button
           onClick={() => {
@@ -1114,47 +1208,51 @@ export default function FridgeChefApp() {
     isScanning ? "scan" : isGenerating ? "cook" : isSpeaking ? "talk" : "idle";
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/genie-bg.png')",
-        }}
-      />
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#ece8f1]">
+      <GenieBackground />
 
-      <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
-
-      <div className="relative mx-auto w-full max-w-md px-4 pt-6 pb-[260px] sm:pb-[220px]">
+      <div className="relative z-10 mx-auto w-full max-w-md px-4 pt-6 pb-[260px] sm:pb-[220px]">
         <div className="rounded-[34px] border border-amber-200/70 bg-[#fff8ee]/95 p-5 shadow-[0_18px_40px_rgba(245,158,11,0.18)] backdrop-blur-sm">
           <div className="text-[26px] font-black tracking-tight text-[#111827]">{homeTitle}</div>
-          <div className="mt-1 text-[17px] font-black text-[#1f2937]">{homeSubtitle}</div>
+          <div className="mt-1 text-[18px] font-black text-[#1f2937]">{homeSubtitle}</div>
           <div className="mt-2 text-[15px] font-semibold leading-7 text-slate-700">{homeLine}</div>
         </div>
 
         {screen === "home" && (
-          <div className="mt-5 grid gap-4">
-            <button
-              onClick={() => {
-                resetAll();
-                setScreen("recipe");
-              }}
-              className="w-full rounded-[32px] bg-black p-5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition active:scale-[0.98]"
-            >
-              <div className="text-[22px] font-black tracking-tight">Tarif</div>
-              <div className="mt-2 text-[15px] font-semibold text-white/85">Dolap foto → tara → seç → tarif</div>
-            </button>
+          <>
+            <div className="mt-4 rounded-3xl border border-white/40 bg-white/85 p-4 backdrop-blur-md">
+              <div className="text-sm font-black text-[#111827]">Bugünün büyüsü</div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                Foto çek, ürünleri seç, Cin sana tarif ya da kokteyl çıkarsın. Sonra da adım adım okusun.
+              </div>
+            </div>
 
-            <button
-              onClick={() => {
-                resetAll();
-                setScreen("cocktail");
-              }}
-              className="w-full rounded-[32px] border border-white/40 bg-white/95 p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm transition active:scale-[0.98]"
-            >
-              <div className="text-[22px] font-black tracking-tight text-[#111827]">Kokteyl</div>
-              <div className="mt-2 text-[15px] font-semibold text-slate-700">Şişe foto → tara → seç → karışım</div>
-            </button>
-          </div>
+            <div className="mt-5 grid gap-4">
+              <button
+                onClick={() => {
+                  resetAll();
+                  setScreen("recipe");
+                }}
+                className="w-full rounded-[32px] bg-black p-5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
+              >
+                <div className="text-[22px] font-black tracking-tight">🍳 Tarif</div>
+                <div className="mt-2 text-[15px] font-semibold text-white/85">Dolap foto → tara → seç → tarif</div>
+                <div className="mt-3 text-xs font-bold uppercase tracking-wide text-white/60">Cin Şef mutfakta</div>
+              </button>
+
+              <button
+                onClick={() => {
+                  resetAll();
+                  setScreen("cocktail");
+                }}
+                className="w-full rounded-[32px] border border-white/40 bg-white/95 p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm"
+              >
+                <div className="text-[22px] font-black tracking-tight text-[#111827]">🍸 Kokteyl</div>
+                <div className="mt-2 text-[15px] font-semibold text-slate-700">Şişe foto → tara → seç → karışım</div>
+                <div className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">Cin Şef barda</div>
+              </button>
+            </div>
+          </>
         )}
 
         {screen !== "home" && (
@@ -1164,7 +1262,11 @@ export default function FridgeChefApp() {
 
             {screen === "cocktail" && (
               <div className={`mt-4 p-4 ${glassPanelSoft}`}>
-                <div className="text-sm font-black text-[#111827]">Güç seviyesi</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-black text-[#111827]">Güç seviyesi</div>
+                  <div className="text-xs font-bold text-slate-500">Bardak karakteri</div>
+                </div>
+
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {(["hafif", "orta", "sert"] as AlcoholLevel[]).map((lvl) => (
                     <button
@@ -1172,7 +1274,7 @@ export default function FridgeChefApp() {
                       onClick={() => {
                         resetIdleTimer();
                         setAlcoholLevel(lvl);
-                        speak(`Tamam 😎 Güç: ${lvl}`);
+                        speak(`Tamam. Güç seviyesi ${lvl} 😎`);
                       }}
                       className={
                         "rounded-2xl px-3 py-2.5 text-sm font-black border transition " +
@@ -1214,7 +1316,7 @@ export default function FridgeChefApp() {
                     else generateCocktail();
                   }}
                   disabled={isGenerating}
-                  className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition active:scale-[0.98] disabled:opacity-40"
+                  className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] disabled:opacity-40"
                 >
                   {isGenerating ? "Hazırlanıyor…" : screen === "recipe" ? "Seçilenlerle Tarif Yap" : "Seçilenlerle Karışım Yap"}
                 </button>
@@ -1232,7 +1334,7 @@ export default function FridgeChefApp() {
         )}
 
         <div className="mt-6 text-center text-xs font-bold text-slate-700">
-          Cin Şef © — “Satır satır okurum, sen şaşırırsın.”
+          Cin Şef © — “Tarif hiç bu kadar eğlenceli olmamıştı.”
         </div>
       </div>
 
@@ -1244,7 +1346,7 @@ export default function FridgeChefApp() {
           cinAction={cinAction}
           onClick={() => {
             resetIdleTimer();
-            speak("Hadi canım… foto ver de büyüyü yapayım 😎");
+            speak("Hadi canım… foto ver de biraz şov yapalım 😎");
           }}
           onFast={actionFast}
           onFit={actionFit}
