@@ -425,15 +425,11 @@ export default function FridgeChefApp() {
 
       const res = await fetch("/api/dish-image", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       });
 
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
+      if (!res.ok) throw new Error(await res.text());
 
       const data = await res.json();
       setDishImageUrl(data?.imageUrl || "");
@@ -634,10 +630,7 @@ export default function FridgeChefApp() {
     setCocktail(null);
     setAlcoholLevel("orta");
     setImageFile(null);
-    setImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return "";
-    });
+    setImagePreviewUrl("");
     if (fileRef.current) fileRef.current.value = "";
     resetIdleTimer();
   }
@@ -662,14 +655,33 @@ export default function FridgeChefApp() {
     setManualInput("");
     setTryIndex(0);
 
+    if (!file) {
+      setImageFile(null);
+      setImagePreviewUrl("");
+      if (fileRef.current) fileRef.current.value = "";
+      resetIdleTimer();
+      speak("Foto yok… önce onu halledelim 😄");
+      return;
+    }
+
     setImageFile(file);
-    setImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return file ? URL.createObjectURL(file) : "";
-    });
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      setImagePreviewUrl(result);
+    };
+
+    reader.onerror = () => {
+      setImagePreviewUrl("");
+      setError("Fotoğraf okunamadı");
+    };
+
+    reader.readAsDataURL(file);
 
     resetIdleTimer();
-    speak(file ? "Foto geldi. Şimdi büyü zamanı 😎" : "Foto yok… önce onu halledelim 😄");
+    speak("Foto geldi. Şimdi büyü zamanı 😎");
   }
 
   function toggleSelected(name: string) {
@@ -725,7 +737,7 @@ export default function FridgeChefApp() {
 
     setManualInput("");
     resetIdleTimer();
-    speak("Manual malzeme eklendi. Güzel hamle 😎");
+    speak("Manual malzeme eklendi 😎");
   }
 
   function removeManual(it: string) {
@@ -809,7 +821,7 @@ export default function FridgeChefApp() {
 
     if (!finalItems.length) {
       setError("En az 1 ürün seç 🧞");
-      speak("Ürün seçmeden tarif çıkmaz, büyü de çıkmaz 😄");
+      speak("Ürün seçmeden tarif çıkmaz 😄");
       return;
     }
 
@@ -843,7 +855,7 @@ export default function FridgeChefApp() {
       speak("Tarif hazır. Kalori ve sağlık puanını da çıkardım 😎");
     } catch (e: any) {
       setError(e?.message || "Tarif üretilemedi");
-      speak("Tarif çıkmadı… ama ben vazgeçmem 😅");
+      speak("Tarif çıkmadı… 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -870,7 +882,7 @@ export default function FridgeChefApp() {
 
     if (payloadItems.length < 2 || mixerCount === 0) {
       setError("Tek başına içkiyle karışım zor 🧞‍♂️ Manual ekle: buz + limon + soda/tonik/kola.");
-      speak("Karışım için biraz yardımcı lazım: buz, limon, soda gibi 😄");
+      speak("Karışım için biraz yardımcı lazım 😄");
       return;
     }
 
@@ -878,7 +890,7 @@ export default function FridgeChefApp() {
 
     setIsGenerating(true);
     resetIdleTimer();
-    speak("Karışımı ayarlıyorum… barmen tarafım uyandı 😎");
+    speak("Karışımı ayarlıyorum… barmen modu 😎");
 
     try {
       const res = await fetch("/api/cocktail", {
@@ -908,7 +920,7 @@ export default function FridgeChefApp() {
       speak("Karışım hazır. Güç ve alkol oranını da hesapladım 😎");
     } catch (e: any) {
       setError(e?.message || "Kokteyl üretilemedi");
-      speak("Kokteyl çıkmadı… ama sahneyi terk etmiyorum 😅");
+      speak("Kokteyl çıkmadı… 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -919,7 +931,7 @@ export default function FridgeChefApp() {
     setCinAction("fast");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Pratik mod açıldı. Daha hızlı ve temiz 😎" : "Hız modu açıldı. Uzatmadan lezzet 😎");
+    speak(screen === "cocktail" ? "Pratik mod açıldı 😎" : "Hız modu açıldı 😎");
 
     const next = tryIndex + 11;
     setTryIndex(next);
@@ -935,7 +947,7 @@ export default function FridgeChefApp() {
     setCinAction("fit");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Uzun içim modu. Daha ferah, daha havalı 🧊" : "Fit mod açıldı. Hafif ama iddialı 🥗");
+    speak(screen === "cocktail" ? "Uzun içim modu 🧊" : "Fit mod açıldı 🥗");
 
     const next = tryIndex + 22;
     setTryIndex(next);
@@ -951,7 +963,7 @@ export default function FridgeChefApp() {
     setCinAction("new");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak("Yeni fikir geliyor. Bu sefer daha artistik olabilir 🎲");
+    speak("Yeni fikir geliyor 🎲");
 
     const next = tryIndex + 1;
     setTryIndex(next);
@@ -991,7 +1003,7 @@ export default function FridgeChefApp() {
           <button
             onClick={() => {
               resetIdleTimer();
-              speak("Ben hazırım. Biraz şov, biraz tarif 😄");
+              speak("Ben hazırım 😄");
             }}
             className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
           >
@@ -1130,7 +1142,7 @@ export default function FridgeChefApp() {
             <div className="rounded-2xl bg-slate-50 p-3">
               <div className="text-xs font-bold text-slate-500">Sağlık Puanı</div>
               <div className="mt-1 text-sm font-black text-[#111827]">
-                {typeof recipe?.healthScore === "number" ? `${recipe.healthScore}/10` : "-"}
+                {typeof recipe?.healthScore === "number" && recipe.healthScore > 0 ? `${recipe.healthScore}/10` : "-"}
               </div>
             </div>
 
@@ -1200,8 +1212,10 @@ export default function FridgeChefApp() {
     <>
       <div className={`mt-4 p-5 text-center ${glassPanelSoft}`}>
         <div className="text-sm font-black text-[#111827]">{label}</div>
+
         {imagePreviewUrl ? (
           <img
+            key={imagePreviewUrl}
             src={imagePreviewUrl}
             className="mt-4 w-full rounded-3xl border border-black/10 object-cover"
             alt="preview"
@@ -1219,11 +1233,19 @@ export default function FridgeChefApp() {
         accept="image/*"
         capture={isMobile ? "environment" : undefined}
         className="hidden"
-        onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null;
+          onPickFile(file);
+        }}
       />
 
       <button
-        onClick={() => fileRef.current?.click()}
+        onClick={() => {
+          if (fileRef.current) {
+            fileRef.current.value = "";
+            fileRef.current.click();
+          }
+        }}
         className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
       >
         Kamera / Fotoğraf Aç
@@ -1311,11 +1333,7 @@ export default function FridgeChefApp() {
 
         {dishImageUrl && (
           <div className="mb-4 overflow-hidden rounded-3xl border border-white/50 bg-white/80 shadow-[0_10px_28px_rgba(15,23,42,0.10)]">
-            <img
-              src={dishImageUrl}
-              alt="AI sunum görseli"
-              className="h-64 w-full object-cover"
-            />
+            <img src={dishImageUrl} alt="AI sunum görseli" className="h-64 w-full object-cover" />
           </div>
         )}
 
@@ -1345,10 +1363,7 @@ export default function FridgeChefApp() {
               return (
                 <li
                   key={i}
-                  className={
-                    "mt-2 rounded-xl px-2 py-2 transition " +
-                    (active ? "bg-black text-white shadow-sm" : "bg-transparent")
-                  }
+                  className={"mt-2 rounded-xl px-2 py-2 transition " + (active ? "bg-black text-white shadow-sm" : "bg-transparent")}
                 >
                   <span className="mr-2">{getStepBadge(x, screen)}</span>
                   {x}
@@ -1421,18 +1436,10 @@ export default function FridgeChefApp() {
           <div className="mt-2 text-[15px] font-semibold leading-7 text-slate-700">{homeLine}</div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
-              AI Vision
-            </div>
-            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
-              Türkçe Tarif
-            </div>
-            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
-              Adım Adım Okuma
-            </div>
-            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
-              AI Sunum Görseli
-            </div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">AI Vision</div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">Türkçe Tarif</div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">Adım Adım Okuma</div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">AI Sunum Görseli</div>
           </div>
         </div>
 
@@ -1496,9 +1503,7 @@ export default function FridgeChefApp() {
                       }}
                       className={
                         "rounded-2xl px-3 py-2.5 text-sm font-black border transition " +
-                        (alcoholLevel === lvl
-                          ? "bg-black text-white border-black shadow-sm"
-                          : "bg-white text-[#111827] border-black/10")
+                        (alcoholLevel === lvl ? "bg-black text-white border-black shadow-sm" : "bg-white text-[#111827] border-black/10")
                       }
                     >
                       {lvl}
