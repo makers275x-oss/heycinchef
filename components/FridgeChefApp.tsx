@@ -211,7 +211,6 @@ const ManualPanel = React.memo(function ManualPanel(props: {
     </div>
   );
 });
-
 function ChefCin({
   mode,
   bubble,
@@ -240,9 +239,14 @@ function ChefCin({
 
   const hint = screen === "cocktail" ? "Karışım stili" : "Tarif stili";
 
-  const btnBase = "rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold";
-  const btnOn = "bg-black text-white border-black";
-  const btnOff = "bg-white border-black/20 text-black";
+  const btnBase =
+    "rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold shadow-sm active:scale-95";
+  const btnOn = "bg-black text-white border-black scale-[1.04]";
+  const btnOff = "bg-white border-black/15 text-black hover:bg-slate-50";
+
+  const isTalking = mode === "talk";
+  const isCooking = mode === "cook";
+  const isScanning = mode === "scan";
 
   return (
     <div
@@ -255,10 +259,45 @@ function ChefCin({
       className="select-none cursor-pointer"
       aria-label="Chef Cin"
     >
-      <div className="pointer-events-auto mb-2 ml-auto w-[230px] sm:w-[290px] rounded-[22px] border border-white/50 bg-white/92 px-3 py-3 text-sm font-bold text-[#111827] shadow-[0_12px_35px_rgba(0,0,0,0.16)] backdrop-blur-md">
-        <div className="line-clamp-2 text-[13px] sm:text-sm">{bubble || "Hazırım 😎"}</div>
+      <style jsx>{`
+        @keyframes genieFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes blink {
+          0%, 44%, 48%, 100% { transform: scaleY(1); }
+          46% { transform: scaleY(0.12); }
+        }
+        @keyframes talkMouth {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(1.35); }
+        }
+        @keyframes spoonWave {
+          0%, 100% { transform: rotate(0deg); }
+          50% { transform: rotate(8deg); }
+        }
+        @keyframes steam {
+          0% { transform: translateY(8px); opacity: 0; }
+          30% { opacity: 0.45; }
+          100% { transform: translateY(-18px); opacity: 0; }
+        }
+        @keyframes sparkle {
+          0%,100% { opacity: 0.35; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.12); }
+        }
+        .genie-float { animation: genieFloat 3s ease-in-out infinite; }
+        .genie-eye { animation: blink 5s infinite; transform-origin: center; }
+        .genie-mouth-talk { animation: talkMouth 0.45s infinite ease-in-out; transform-origin: center; }
+        .spoon-wave { animation: spoonWave 1.2s ease-in-out infinite; transform-origin: 150px 128px; }
+        .steam-1 { animation: steam 1.8s ease-out infinite; }
+        .steam-2 { animation: steam 1.8s ease-out infinite 0.5s; }
+        .sparkle { animation: sparkle 1.6s ease-in-out infinite; }
+      `}</style>
 
-        <div className="mt-2 flex flex-wrap gap-2">
+      <div className="pointer-events-auto mb-2 ml-auto w-[240px] sm:w-[300px] rounded-[24px] border border-white/55 bg-white/92 px-4 py-3 text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
+        <div className="line-clamp-2 text-[14px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={(e) => {
@@ -296,40 +335,163 @@ function ChefCin({
         <div className="mt-2 text-[11px] font-semibold text-slate-600">{hint}</div>
       </div>
 
-      <svg width="118" height="150" viewBox="0 0 150 170" className="ml-auto drop-shadow-xl sm:h-[190px] sm:w-[150px]">
-        <ellipse cx="78" cy="160" rx="42" ry="9" fill="rgba(0,0,0,0.15)" />
-        <g>
-          <path
-            d="M78 140 C55 145, 52 125, 62 115 C48 105, 58 92, 72 98 C72 82, 96 82, 96 98 C112 90, 120 106, 104 116 C116 126, 104 148, 78 140 Z"
-            fill="#3BA7FF"
-            opacity="0.92"
-          />
-          <path
-            d="M52 120 C46 92, 58 64, 78 62 C98 64, 110 92, 104 120 C95 140, 61 140, 52 120 Z"
-            fill="#1E90FF"
-          />
-          <circle cx="78" cy="78" r="28" fill="#7CC7FF" />
-          <circle cx="70" cy="76" r="4" fill="#0B1B2B" />
-          <circle cx="90" cy="76" r="4" fill="#0B1B2B" />
-          {mode === "talk" ? (
-            <path d="M88 108 Q96 116 104 108" stroke="#0B1B2B" strokeWidth="3" strokeLinecap="round" />
-          ) : mode === "cook" ? (
-            <path d="M88 108 Q96 112 104 108" stroke="#0B1B2B" strokeWidth="3" strokeLinecap="round" />
-          ) : (
-            <path d="M88 108 Q96 110 104 108" stroke="#0B1B2B" strokeWidth="3" strokeLinecap="round" />
+      <div className="ml-auto w-[190px] sm:w-[215px] genie-float">
+        <svg viewBox="0 0 220 260" className="h-auto w-full overflow-visible">
+          <ellipse cx="110" cy="238" rx="56" ry="12" fill="rgba(0,0,0,0.12)" />
+
+          <g className="sparkle">
+            <path d="M28 70 L33 82 L45 87 L33 92 L28 104 L23 92 L11 87 L23 82 Z" fill="#FACC15" />
+          </g>
+          <g className="sparkle" style={{ animationDelay: "0.4s" }}>
+            <path d="M188 92 L192 101 L201 105 L192 109 L188 118 L184 109 L175 105 L184 101 Z" fill="#FACC15" />
+          </g>
+
+          {(isCooking || isTalking) && (
+            <>
+              <ellipse className="steam-1" cx="58" cy="102" rx="14" ry="10" fill="rgba(255,255,255,0.35)" />
+              <ellipse className="steam-2" cx="66" cy="94" rx="12" ry="8" fill="rgba(255,255,255,0.28)" />
+            </>
           )}
-          <path
-            d="M60 52 C58 40, 66 34, 74 38 C76 30, 88 30, 90 38 C98 34, 106 40, 104 52 C92 58, 72 58, 60 52 Z"
-            fill="#FFFFFF"
-            stroke="rgba(0,0,0,0.15)"
-          />
-          <rect x="62" y="50" width="44" height="10" rx="5" fill="#F3F3F3" stroke="rgba(0,0,0,0.12)" />
-        </g>
-      </svg>
+
+          {isScanning && (
+            <>
+              <circle cx="110" cy="104" r="58" fill="rgba(59,130,246,0.08)" />
+              <circle cx="110" cy="104" r="72" fill="rgba(59,130,246,0.05)" />
+            </>
+          )}
+
+          <g>
+            <path
+              d="M108 220 C82 224, 70 201, 80 184 C64 172, 72 152, 92 156 C92 132, 128 132, 128 156 C148 152, 156 172, 140 184 C150 201, 136 225, 108 220 Z"
+              fill="url(#smokeGrad)"
+            />
+            <path
+              d="M84 163 C80 196, 136 196, 132 163 C130 132, 123 118, 108 116 C93 118, 86 132, 84 163 Z"
+              fill="url(#bodyGrad)"
+            />
+
+            <ellipse cx="110" cy="92" rx="46" ry="44" fill="#68BCFF" />
+            <ellipse cx="95" cy="76" rx="15" ry="11" fill="rgba(255,255,255,0.24)" />
+
+           
+
+           
+
+            <g transform="translate(58 10)">
+              <ellipse cx="52" cy="38" rx="18" ry="28" fill="#fff" />
+              <ellipse cx="26" cy="50" rx="22" ry="18" fill="#fff" />
+              <ellipse cx="52" cy="46" rx="24" ry="20" fill="#fff" />
+              <ellipse cx="80" cy="50" rx="22" ry="18" fill="#fff" />
+              <ellipse cx="100" cy="40" rx="18" ry="16" fill="#fff" />
+              <rect x="20" y="54" width="64" height="14" rx="7" fill="#F3F4F6" stroke="rgba(0,0,0,0.08)" />
+            </g>
+
+            <path d="M73 54 Q110 30 147 54" stroke="#D97706" strokeWidth="14" strokeLinecap="round" fill="none" />
+            <circle cx="110" cy="46" r="13" fill="#F59E0B" />
+            <circle cx="110" cy="46" r="8" fill="#DC2626" />
+            <circle cx="106" cy="42" r="2.8" fill="#fff" />
+
+            {/* daha tatlı büyük göz */}
+            <ellipse cx="93" cy="98" rx="15" ry="19" fill="#fff" />
+            <ellipse cx="126" cy="98" rx="15" ry="19" fill="#fff" />
+            <ellipse cx="95" cy="100" rx="9.5" ry="12.5" fill="#111827" className="genie-eye" />
+            <ellipse cx="124" cy="100" rx="9.5" ry="12.5" fill="#111827" className="genie-eye" />
+            <circle cx="98" cy="95" r="3.8" fill="#fff" />
+            <circle cx="127" cy="95" r="3.8" fill="#fff" />
+            <circle cx="94" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
+            <circle cx="123" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
+
+            {/* daha belirgin yanak */}
+            <ellipse cx="84" cy="118" rx="10" ry="6" fill="rgba(255,120,120,0.34)" />
+            <ellipse cx="136" cy="118" rx="10" ry="6" fill="rgba(255,120,120,0.34)" />
+
+            {isTalking ? (
+              <g className="genie-mouth-talk">
+                <ellipse cx="110" cy="126" rx="10" ry="8" fill="#7F1D1D" />
+                <path d="M102 123 Q110 132 118 123" fill="#FCA5A5" />
+              </g>
+            ) : (
+              <path d="M100 126 Q110 134 120 126" stroke="#111827" strokeWidth="3.2" strokeLinecap="round" fill="none" />
+            )}
+
+            <path
+              d="M73 132 C60 132, 47 122, 45 108"
+              stroke="#2F83FF"
+              strokeWidth="10"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx="44" cy="106" r="8" fill="#2F83FF" />
+            <ellipse cx="38" cy="102" rx="20" ry="15" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="2" />
+            <path d="M20 102 H56" stroke="#D1D5DB" strokeWidth="2" />
+
+            <g className={isTalking || isCooking ? "spoon-wave" : ""}>
+              <path
+                d="M146 132 C160 132, 171 124, 177 112"
+                stroke="#2F83FF"
+                strokeWidth="10"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <ellipse cx="183" cy="100" rx="9" ry="14" fill="#B45309" />
+              <rect x="177" y="112" width="6" height="24" rx="3" fill="#92400E" />
+            </g>
+
+            <path
+              d="M76 150 C86 141, 96 138, 110 138 C124 138, 134 141, 144 150"
+              stroke="#DC2626"
+              strokeWidth="8"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx="100" cy="151" r="4" fill="#DC2626" />
+            <circle cx="120" cy="151" r="4" fill="#DC2626" />
+          </g>
+
+          <g>
+            <path
+              d="M42 214 C55 193, 93 187, 126 195 C144 199, 151 207, 147 215 C142 224, 109 229, 78 226 C57 224, 40 220, 42 214 Z"
+              fill="url(#lampGrad)"
+              stroke="#A16207"
+              strokeWidth="2"
+            />
+            <path
+              d="M126 198 C138 194, 151 195, 160 202"
+              stroke="#A16207"
+              strokeWidth="6"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d="M51 211 C42 207, 35 200, 35 192"
+              stroke="#A16207"
+              strokeWidth="6"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </g>
+
+          <defs>
+            <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#8DDCFF" />
+              <stop offset="60%" stopColor="#4DA8FF" />
+              <stop offset="100%" stopColor="#2563EB" />
+            </linearGradient>
+            <linearGradient id="smokeGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#A5D8FF" />
+              <stop offset="100%" stopColor="#3B82F6" />
+            </linearGradient>
+            <linearGradient id="lampGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#FDE68A" />
+              <stop offset="60%" stopColor="#F59E0B" />
+              <stop offset="100%" stopColor="#B45309" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
     </div>
   );
 }
-
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
