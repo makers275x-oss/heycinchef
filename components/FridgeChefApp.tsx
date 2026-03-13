@@ -360,6 +360,8 @@ export default function FridgeChefApp() {
   const [cocktail, setCocktail] = useState<CocktailResponse | null>(null);
   const [alcoholLevel, setAlcoholLevel] = useState<AlcoholLevel>("orta");
 
+  const [persons, setPersons] = useState(2);
+
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceURI, setVoiceURI] = useState<string>("");
@@ -389,6 +391,14 @@ export default function FridgeChefApp() {
     const steps = screen === "cocktail" ? cocktail?.steps : recipe?.steps;
     return (Array.isArray(steps) ? steps : []).map((x) => String(x || "").trim()).filter(Boolean);
   }, [screen, recipe, cocktail]);
+
+  const scaledIngredients = useMemo(() => {
+    if (screen !== "recipe") return recipe?.ingredients || [];
+
+    return (recipe?.ingredients || []).map((item) =>
+      String(item).replace(/(\d+(\.\d+)?)/, (n) => String(Number(n) * persons))
+    );
+  }, [recipe, persons, screen]);
 
   const activeStepText = safeSteps[stepIndex] || safeSteps[0] || "";
   const activeStepBadge = getStepBadge(activeStepText, screen);
@@ -629,6 +639,7 @@ export default function FridgeChefApp() {
     setRecipe(null);
     setCocktail(null);
     setAlcoholLevel("orta");
+    setPersons(2);
     setImageFile(null);
     setImagePreviewUrl("");
     if (fileRef.current) fileRef.current.value = "";
@@ -835,7 +846,7 @@ export default function FridgeChefApp() {
       const res = await fetch("/api/recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: finalItems, variation: v }),
+        body: JSON.stringify({ items: finalItems, variation: v, persons }),
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -1342,6 +1353,33 @@ export default function FridgeChefApp() {
           <div className="mt-2 text-[15px] font-semibold leading-6 text-slate-700">{data.summary}</div>
         </div>
 
+        {screen === "recipe" && (
+          <div className="mt-4 rounded-[24px] border border-white/45 bg-white/90 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-md">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-black text-[#111827]">Kaç kişilik</div>
+              <div className="rounded-full bg-black px-3 py-1 text-xs font-extrabold text-white">
+                {persons} kişilik
+              </div>
+            </div>
+
+            <input
+              type="range"
+              min={1}
+              max={8}
+              step={1}
+              value={persons}
+              onChange={(e) => setPersons(Number(e.target.value))}
+              className="mt-4 w-full accent-black"
+            />
+
+            <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
+              <span>1</span>
+              <span>4</span>
+              <span>8</span>
+            </div>
+          </div>
+        )}
+
         <PremiumPanel />
         <StepFunPanel />
         <MetaInfoPanel />
@@ -1349,7 +1387,7 @@ export default function FridgeChefApp() {
         <div className="mt-5 rounded-3xl bg-slate-50/80 p-4">
           <div className="text-sm font-black text-[#111827]">Malzemeler</div>
           <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
-            {(data.ingredients || []).map((x, i) => (
+            {(screen === "recipe" ? scaledIngredients : data.ingredients || []).map((x, i) => (
               <li key={i}>{x}</li>
             ))}
           </ul>
@@ -1531,6 +1569,33 @@ export default function FridgeChefApp() {
                   addManual={addManual}
                   removeManual={removeManual}
                 />
+
+                {screen === "recipe" && (
+                  <div className={`mt-4 p-4 ${glassPanelSoft}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-black text-[#111827]">Kaç kişilik tarif</div>
+                      <div className="rounded-full bg-black px-3 py-1 text-xs font-extrabold text-white">
+                        {persons} kişilik
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={1}
+                      max={8}
+                      step={1}
+                      value={persons}
+                      onChange={(e) => setPersons(Number(e.target.value))}
+                      className="mt-4 w-full accent-black"
+                    />
+
+                    <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
+                      <span>1</span>
+                      <span>4</span>
+                      <span>8</span>
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => {
