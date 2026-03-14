@@ -503,6 +503,7 @@ export default function FridgeChefApp() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
@@ -814,49 +815,43 @@ export default function FridgeChefApp() {
     setScreen("home");
   }
 
-  function onPickFile(file: File | null) {
-    setError("");
-    setRecipe(null);
-    setCocktail(null);
-    setDishImageUrl("");
-    stopSpeaking();
+function onPickFile(file: File | null) {
+  setError("");
+  setRecipe(null);
+  setCocktail(null);
+  setDishImageUrl("");
+  stopSpeaking();
 
-    setScanDone(false);
-    setVisionFood([]);
-    setVisionDrinks([]);
-    setSelectedNames([]);
-    setManualItems([]);
-    setManualInput("");
-    setTryIndex(0);
+  setScanDone(false);
+  setVisionFood([]);
+  setVisionDrinks([]);
+  setSelectedNames([]);
+  setManualItems([]);
+  setManualInput("");
+  setTryIndex(0);
 
-    if (!file) {
-      setImageFile(null);
-      setImagePreviewUrl("");
-      if (fileRef.current) fileRef.current.value = "";
-      resetIdleTimer();
-      speak("Foto yok… önce onu halledelim 😄");
-      return;
-    }
-
-    setImageFile(file);
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      setImagePreviewUrl(result);
-    };
-
-    reader.onerror = () => {
-      setImagePreviewUrl("");
-      setError("Fotoğraf okunamadı");
-    };
-
-    reader.readAsDataURL(file);
-
+  if (!file) {
+    setImageFile(null);
+    setImagePreviewUrl("");
     resetIdleTimer();
-    speak("Foto geldi. Şimdi büyü zamanı 😎");
+    speak("Foto yok… önce onu halledelim 😄");
+    setFileInputKey((k) => k + 1);
+    return;
   }
+
+  if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(imagePreviewUrl);
+  }
+
+  setImageFile(file);
+  setImagePreviewUrl(URL.createObjectURL(file));
+  resetIdleTimer();
+  speak("Foto geldi. Şimdi büyü zamanı 😎");
+
+  setTimeout(() => {
+    setFileInputKey((k) => k + 1);
+  }, 0);
+}
 
   function toggleSelected(name: string) {
     const n = normalize(name);
@@ -1402,23 +1397,28 @@ export default function FridgeChefApp() {
       </div>
 
       <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        capture={isMobile ? "environment" : undefined}
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0] ?? null;
-          onPickFile(file);
-        }}
-      />
+  key={fileInputKey}
+  ref={fileRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  className="hidden"
+  onChange={(e) => {
+    const file = e.currentTarget.files?.[0] ?? null;
+    onPickFile(file);
+  }}
+  onInput={(e) => {
+    const file = (e.currentTarget as HTMLInputElement).files?.[0] ?? null;
+    if (file && !imageFile) onPickFile(file);
+  }}
+/>
 
       <button
-       onClick={() => fileRef.current?.click()}
-        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-      >
-        Kamera / Fotoğraf Aç
-      </button>
+  onClick={() => fileRef.current?.click()}
+  className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+>
+  Kamera / Fotoğraf Aç
+</button>
 
       <button
         onClick={scanImage}
