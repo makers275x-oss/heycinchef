@@ -814,49 +814,38 @@ export default function FridgeChefApp() {
     setScreen("home");
   }
 
-  function onPickFile(file: File | null) {
-    setError("");
-    setRecipe(null);
-    setCocktail(null);
-    setDishImageUrl("");
-    stopSpeaking();
+ function onPickFile(file: File | null) {
+  setError("");
+  setRecipe(null);
+  setCocktail(null);
+  setDishImageUrl("");
+  stopSpeaking();
 
-    setScanDone(false);
-    setVisionFood([]);
-    setVisionDrinks([]);
-    setSelectedNames([]);
-    setManualItems([]);
-    setManualInput("");
-    setTryIndex(0);
+  setScanDone(false);
+  setVisionFood([]);
+  setVisionDrinks([]);
+  setSelectedNames([]);
+  setManualItems([]);
+  setManualInput("");
+  setTryIndex(0);
 
-    if (!file) {
-      setImageFile(null);
-      setImagePreviewUrl("");
-      if (fileRef.current) fileRef.current.value = "";
-      resetIdleTimer();
-      speak("Foto yok… önce onu halledelim 😄");
-      return;
-    }
-
-    setImageFile(file);
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      setImagePreviewUrl(result);
-    };
-
-    reader.onerror = () => {
-      setImagePreviewUrl("");
-      setError("Fotoğraf okunamadı");
-    };
-
-    reader.readAsDataURL(file);
-
+  if (!file) {
+    setImageFile(null);
+    setImagePreviewUrl("");
+    if (fileRef.current) fileRef.current.value = "";
     resetIdleTimer();
-    speak("Foto geldi. Şimdi büyü zamanı 😎");
+    speak("Foto yok… önce onu halledelim 😄");
+    return;
   }
+
+  setImageFile(file);
+
+  const objectUrl = URL.createObjectURL(file);
+  setImagePreviewUrl(objectUrl);
+
+  resetIdleTimer();
+  speak("Foto geldi. Şimdi büyü zamanı 😎");
+}
 
   function toggleSelected(name: string) {
     const n = normalize(name);
