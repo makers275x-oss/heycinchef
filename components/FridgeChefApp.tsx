@@ -294,8 +294,8 @@ function ChefCin({
         .sparkle { animation: sparkle 1.6s ease-in-out infinite; }
       `}</style>
 
-      <div className="pointer-events-auto mb-2 ml-auto w-[240px] sm:w-[300px] rounded-[24px] border border-white/55 bg-white/92 px-4 py-3 text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
-        <div className="line-clamp-2 text-[14px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
+<div className="pointer-events-auto mb-2 ml-auto w-[170px] sm:w-[300px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
+        <div className="truncate text-[12px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
