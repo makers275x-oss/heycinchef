@@ -294,7 +294,7 @@ function ChefCin({
         .sparkle { animation: sparkle 1.6s ease-in-out infinite; }
       `}</style>
 
-<div className="pointer-events-auto mb-2 ml-auto w-[170px] sm:w-[300px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
+      <div className="pointer-events-auto mb-2 ml-auto w-[170px] sm:w-[300px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
         <div className="truncate text-[12px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -335,47 +335,48 @@ function ChefCin({
         <div className="mt-2 text-[11px] font-semibold text-slate-600">{hint}</div>
       </div>
 
-      <div className="ml-auto w-[190px] sm:w-[215px] genie-float">
+      <div className="ml-auto w-[180px] sm:w-[205px] genie-float">
         <svg viewBox="0 0 220 260" className="h-auto w-full overflow-visible">
-          <ellipse cx="110" cy="238" rx="56" ry="12" fill="rgba(0,0,0,0.12)" />
+          <ellipse cx="110" cy="240" rx="52" ry="10" fill="rgba(0,0,0,0.10)" />
 
           <g className="sparkle">
-            <path d="M28 70 L33 82 L45 87 L33 92 L28 104 L23 92 L11 87 L23 82 Z" fill="#FACC15" />
+            <path d="M28 74 L33 84 L43 89 L33 94 L28 104 L23 94 L13 89 L23 84 Z" fill="#FACC15" />
           </g>
           <g className="sparkle" style={{ animationDelay: "0.4s" }}>
-            <path d="M188 92 L192 101 L201 105 L192 109 L188 118 L184 109 L175 105 L184 101 Z" fill="#FACC15" />
+            <path d="M188 96 L192 104 L200 108 L192 112 L188 120 L184 112 L176 108 L184 104 Z" fill="#FACC15" />
           </g>
 
           {(isCooking || isTalking) && (
             <>
-              <ellipse className="steam-1" cx="58" cy="102" rx="14" ry="10" fill="rgba(255,255,255,0.35)" />
-              <ellipse className="steam-2" cx="66" cy="94" rx="12" ry="8" fill="rgba(255,255,255,0.28)" />
+              <ellipse className="steam-1" cx="74" cy="170" rx="12" ry="9" fill="rgba(255,255,255,0.34)" />
+              <ellipse className="steam-2" cx="84" cy="162" rx="10" ry="7" fill="rgba(255,255,255,0.24)" />
             </>
           )}
 
           {isScanning && (
             <>
-              <circle cx="110" cy="104" r="58" fill="rgba(59,130,246,0.08)" />
-              <circle cx="110" cy="104" r="72" fill="rgba(59,130,246,0.05)" />
+              <circle cx="110" cy="102" r="58" fill="rgba(59,130,246,0.08)" />
+              <circle cx="110" cy="102" r="72" fill="rgba(59,130,246,0.05)" />
             </>
           )}
 
+          {/* Cin */}
           <g>
+            {/* duman kuyruğu */}
             <path
-              d="M108 220 C82 224, 70 201, 80 184 C64 172, 72 152, 92 156 C92 132, 128 132, 128 156 C148 152, 156 172, 140 184 C150 201, 136 225, 108 220 Z"
+              d="M108 214 C88 218, 76 205, 80 190 C66 180, 72 162, 90 165 C90 145, 126 145, 126 165 C144 161, 150 180, 138 190 C142 204, 130 218, 108 214 Z"
               fill="url(#smokeGrad)"
             />
+
             <path
-              d="M84 163 C80 196, 136 196, 132 163 C130 132, 123 118, 108 116 C93 118, 86 132, 84 163 Z"
+              d="M86 156 C82 188, 134 188, 130 156 C128 132, 121 118, 108 116 C95 118, 88 132, 86 156 Z"
               fill="url(#bodyGrad)"
             />
 
-            <ellipse cx="110" cy="92" rx="46" ry="44" fill="#68BCFF" />
-            <ellipse cx="95" cy="76" rx="15" ry="11" fill="rgba(255,255,255,0.24)" />
+            <ellipse cx="110" cy="92" rx="44" ry="42" fill="#63B6FF" />
+            <ellipse cx="96" cy="78" rx="14" ry="10" fill="rgba(255,255,255,0.22)" />
 
-           
-
-           
+            {/* kulaklar yok */}
 
             <g transform="translate(58 10)">
               <ellipse cx="52" cy="38" rx="18" ry="28" fill="#fff" />
@@ -391,7 +392,6 @@ function ChefCin({
             <circle cx="110" cy="46" r="8" fill="#DC2626" />
             <circle cx="106" cy="42" r="2.8" fill="#fff" />
 
-            {/* daha tatlı büyük göz */}
             <ellipse cx="93" cy="98" rx="15" ry="19" fill="#fff" />
             <ellipse cx="126" cy="98" rx="15" ry="19" fill="#fff" />
             <ellipse cx="95" cy="100" rx="9.5" ry="12.5" fill="#111827" className="genie-eye" />
@@ -401,9 +401,7 @@ function ChefCin({
             <circle cx="94" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
             <circle cx="123" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
 
-            {/* daha belirgin yanak */}
-            <ellipse cx="84" cy="118" rx="10" ry="6" fill="rgba(255,120,120,0.34)" />
-            <ellipse cx="136" cy="118" rx="10" ry="6" fill="rgba(255,120,120,0.34)" />
+            {/* kırmızılık kaldırıldı */}
 
             {isTalking ? (
               <g className="genie-mouth-talk">
@@ -414,17 +412,19 @@ function ChefCin({
               <path d="M100 126 Q110 134 120 126" stroke="#111827" strokeWidth="3.2" strokeLinecap="round" fill="none" />
             )}
 
+            {/* sol el tabak */}
             <path
-              d="M73 132 C60 132, 47 122, 45 108"
+              d="M74 132 C61 132, 48 122, 46 108"
               stroke="#2F83FF"
               strokeWidth="10"
               strokeLinecap="round"
               fill="none"
             />
-            <circle cx="44" cy="106" r="8" fill="#2F83FF" />
-            <ellipse cx="38" cy="102" rx="20" ry="15" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="2" />
-            <path d="M20 102 H56" stroke="#D1D5DB" strokeWidth="2" />
+            <circle cx="45" cy="106" r="8" fill="#2F83FF" />
+            <ellipse cx="39" cy="102" rx="20" ry="15" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="2" />
+            <path d="M21 102 H57" stroke="#D1D5DB" strokeWidth="2" />
 
+            {/* sağ el kaşık */}
             <g className={isTalking || isCooking ? "spoon-wave" : ""}>
               <path
                 d="M146 132 C160 132, 171 124, 177 112"
@@ -438,34 +438,35 @@ function ChefCin({
             </g>
 
             <path
-              d="M76 150 C86 141, 96 138, 110 138 C124 138, 134 141, 144 150"
+              d="M76 148 C86 140, 96 137, 110 137 C124 137, 134 140, 144 148"
               stroke="#DC2626"
               strokeWidth="8"
               strokeLinecap="round"
               fill="none"
             />
-            <circle cx="100" cy="151" r="4" fill="#DC2626" />
-            <circle cx="120" cy="151" r="4" fill="#DC2626" />
+            <circle cx="100" cy="149" r="4" fill="#DC2626" />
+            <circle cx="120" cy="149" r="4" fill="#DC2626" />
           </g>
 
-          <g>
+          {/* daha küçük lamba */}
+          <g transform="translate(8,10)">
             <path
-              d="M42 214 C55 193, 93 187, 126 195 C144 199, 151 207, 147 215 C142 224, 109 229, 78 226 C57 224, 40 220, 42 214 Z"
+              d="M44 206 C54 190, 83 186, 108 192 C121 195, 126 202, 123 208 C119 215, 94 219, 69 217 C53 216, 42 212, 44 206 Z"
               fill="url(#lampGrad)"
               stroke="#A16207"
               strokeWidth="2"
             />
             <path
-              d="M126 198 C138 194, 151 195, 160 202"
+              d="M106 195 C116 192, 127 193, 134 199"
               stroke="#A16207"
-              strokeWidth="6"
+              strokeWidth="5"
               strokeLinecap="round"
               fill="none"
             />
             <path
-              d="M51 211 C42 207, 35 200, 35 192"
+              d="M52 204 C44 201, 39 195, 39 188"
               stroke="#A16207"
-              strokeWidth="6"
+              strokeWidth="5"
               strokeLinecap="round"
               fill="none"
             />
