@@ -8,16 +8,10 @@ type AlcoholLevel = "hafif" | "orta" | "sert";
 type VisionFoodItem = { name: string; confidence?: number };
 type VisionDrinkItem = { name: string; category?: string; confidence?: number };
 
-type RecipeIngredient = {
-  name: string;
-  amount: number;
-  unit: string;
-};
-
 type RecipeResponse = {
   title: string;
   summary: string;
-  ingredients: RecipeIngredient[];
+  ingredients: string[];
   steps: string[];
   calories?: string;
   healthScore?: number;
@@ -119,7 +113,7 @@ function GenieBackground() {
       <img
         src="/genie-bg.png"
         alt="Genie background"
-        className="h-full w-full object-cover object-center"
+        className="h-full w-full object-cover object-[22%_center] sm:object-center"
         draggable={false}
       />
       <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
@@ -217,8 +211,8 @@ const ManualPanel = React.memo(function ManualPanel(props: {
     </div>
   );
 });
-
 function ChefCin({
+  mode,
   bubble,
   screen,
   cinAction,
@@ -227,8 +221,9 @@ function ChefCin({
   onFit,
   onNew,
 }: {
+  mode: "idle" | "scan" | "cook" | "talk";
   bubble: string;
-  screen: "home" | "recipe" | "cocktail";
+  screen: Screen;
   cinAction: "fast" | "fit" | "new" | null;
   onClick?: () => void;
   onFast?: () => void;
@@ -238,18 +233,67 @@ function ChefCin({
   const fastLabel = screen === "cocktail" ? "Pratik" : "Hızlı";
   const fitLabel = screen === "cocktail" ? "Uzun içim" : "Fit";
 
-  const btnBase = "rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold shadow-sm";
-  const btnOn = "bg-black text-white border-black";
-  const btnOff = "bg-white border-black/15 text-black";
+  const fastActive = cinAction === "fast";
+  const fitActive = cinAction === "fit";
+  const newActive = cinAction === "new";
+
+  const hint = screen === "cocktail" ? "Karışım stili" : "Tarif stili";
+
+  const btnBase =
+    "rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold shadow-sm active:scale-95";
+  const btnOn = "bg-black text-white border-black scale-[1.04]";
+  const btnOff = "bg-white border-black/15 text-black hover:bg-slate-50";
+
+  const isTalking = mode === "talk";
+  const isCooking = mode === "cook";
+  const isScanning = mode === "scan";
 
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.();
+      }}
       className="select-none cursor-pointer"
       aria-label="Chef Cin"
     >
+      <style jsx>{`
+        @keyframes genieFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes blink {
+          0%, 44%, 48%, 100% { transform: scaleY(1); }
+          46% { transform: scaleY(0.12); }
+        }
+        @keyframes talkMouth {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(1.35); }
+        }
+        @keyframes spoonWave {
+          0%, 100% { transform: rotate(0deg); }
+          50% { transform: rotate(8deg); }
+        }
+        @keyframes steam {
+          0% { transform: translateY(8px); opacity: 0; }
+          30% { opacity: 0.45; }
+          100% { transform: translateY(-18px); opacity: 0; }
+        }
+        @keyframes sparkle {
+          0%,100% { opacity: 0.35; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.12); }
+        }
+        .genie-float { animation: genieFloat 3s ease-in-out infinite; }
+        .genie-eye { animation: blink 5s infinite; transform-origin: center; }
+        .genie-mouth-talk { animation: talkMouth 0.45s infinite ease-in-out; transform-origin: center; }
+        .spoon-wave { animation: spoonWave 1.2s ease-in-out infinite; transform-origin: 150px 128px; }
+        .steam-1 { animation: steam 1.8s ease-out infinite; }
+        .steam-2 { animation: steam 1.8s ease-out infinite 0.5s; }
+        .sparkle { animation: sparkle 1.6s ease-in-out infinite; }
+      `}</style>
+
       <div className="pointer-events-auto mb-2 ml-auto w-[170px] sm:w-[300px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
         <div className="truncate text-[12px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
 
@@ -260,9 +304,9 @@ function ChefCin({
               e.stopPropagation();
               onFast?.();
             }}
-            className={`${btnBase} ${cinAction === "fast" ? btnOn : btnOff}`}
+            className={`${btnBase} ${fastActive ? btnOn : btnOff}`}
           >
-            ⚡ {fastLabel}
+            ⚡ {fastLabel} {fastActive ? "✓" : ""}
           </button>
 
           <button
@@ -271,9 +315,9 @@ function ChefCin({
               e.stopPropagation();
               onFit?.();
             }}
-            className={`${btnBase} ${cinAction === "fit" ? btnOn : btnOff}`}
+            className={`${btnBase} ${fitActive ? btnOn : btnOff}`}
           >
-            🧊 {fitLabel}
+            🧊 {fitLabel} {fitActive ? "✓" : ""}
           </button>
 
           <button
@@ -282,50 +326,173 @@ function ChefCin({
               e.stopPropagation();
               onNew?.();
             }}
-            className={`${btnBase} ${cinAction === "new" ? btnOn : btnOff}`}
+            className={`${btnBase} ${newActive ? btnOn : btnOff}`}
           >
-            🎲 Yeni
+            🎲 Yeni {newActive ? "✓" : ""}
           </button>
         </div>
 
-        <div className="mt-2 text-[11px] font-semibold text-slate-600">
-          {screen === "cocktail" ? "Karışım stili" : "Tarif stili"}
-        </div>
+        <div className="mt-2 text-[11px] font-semibold text-slate-600">{hint}</div>
       </div>
 
-      <div className="ml-auto flex items-end gap-3">
-        <div className="relative h-[70px] w-[110px]">
-          <div className="absolute bottom-0 left-0 h-[34px] w-[86px] rounded-[999px] bg-gradient-to-r from-amber-300 via-amber-400 to-amber-700 shadow-[0_8px_18px_rgba(0,0,0,0.18)]" />
-          <div className="absolute bottom-[18px] left-[26px] h-[16px] w-[18px] rounded-full bg-amber-300 border border-amber-700" />
-          <div className="absolute bottom-[24px] left-[31px] h-[18px] w-[8px] rounded-full bg-amber-500" />
-          <div className="absolute bottom-[12px] left-[74px] h-[10px] w-[30px] rounded-r-full border-t-[5px] border-r-[5px] border-amber-800" />
-          <div className="absolute bottom-[14px] left-[-8px] h-[12px] w-[22px] rounded-l-full border-b-[5px] border-l-[5px] border-amber-800" />
-        </div>
+      <div className="ml-auto w-[180px] sm:w-[205px] genie-float">
+        <svg viewBox="0 0 220 260" className="h-auto w-full overflow-visible">
+          <ellipse cx="110" cy="240" rx="52" ry="10" fill="rgba(0,0,0,0.10)" />
 
-        <div className="relative w-[130px]">
-          <div className="mx-auto h-[18px] w-[70px] rounded-t-full bg-white" />
-          <div className="mx-auto h-[12px] w-[78px] rounded-full bg-orange-300" />
-          <div className="relative mx-auto mt-1 h-[68px] w-[68px] rounded-full bg-sky-400">
-            <div className="absolute left-[14px] top-[22px] h-[18px] w-[14px] rounded-full bg-white" />
-            <div className="absolute right-[14px] top-[22px] h-[18px] w-[14px] rounded-full bg-white" />
-            <div className="absolute left-[17px] top-[25px] h-[11px] w-[9px] rounded-full bg-slate-900" />
-            <div className="absolute right-[17px] top-[25px] h-[11px] w-[9px] rounded-full bg-slate-900" />
-            <div className="absolute left-[19px] top-[27px] h-[3px] w-[3px] rounded-full bg-white" />
-            <div className="absolute right-[19px] top-[27px] h-[3px] w-[3px] rounded-full bg-white" />
-            <div className="absolute left-[26px] top-[46px] h-[4px] w-[16px] rounded-full border-b-2 border-slate-900" />
-          </div>
+          <g className="sparkle">
+            <path d="M28 74 L33 84 L43 89 L33 94 L28 104 L23 94 L13 89 L23 84 Z" fill="#FACC15" />
+          </g>
+          <g className="sparkle" style={{ animationDelay: "0.4s" }}>
+            <path d="M188 96 L192 104 L200 108 L192 112 L188 120 L184 112 L176 108 L184 104 Z" fill="#FACC15" />
+          </g>
 
-          <div className="mx-auto -mt-1 h-[40px] w-[48px] rounded-t-[20px] rounded-b-[26px] bg-sky-500" />
-          <div className="absolute left-[2px] top-[72px] h-[8px] w-[32px] rotate-[25deg] rounded-full bg-sky-500" />
-          <div className="absolute right-[2px] top-[72px] h-[8px] w-[32px] rotate-[-25deg] rounded-full bg-sky-500" />
-          <div className="absolute left-0 top-[68px] h-[16px] w-[16px] rounded-full bg-sky-500" />
-          <div className="absolute right-0 top-[68px] h-[16px] w-[16px] rounded-full bg-sky-500" />
-        </div>
+          {(isCooking || isTalking) && (
+            <>
+              <ellipse className="steam-1" cx="74" cy="170" rx="12" ry="9" fill="rgba(255,255,255,0.34)" />
+              <ellipse className="steam-2" cx="84" cy="162" rx="10" ry="7" fill="rgba(255,255,255,0.24)" />
+            </>
+          )}
+
+          {isScanning && (
+            <>
+              <circle cx="110" cy="102" r="58" fill="rgba(59,130,246,0.08)" />
+              <circle cx="110" cy="102" r="72" fill="rgba(59,130,246,0.05)" />
+            </>
+          )}
+
+          {/* Cin */}
+          <g>
+            {/* duman kuyruğu */}
+            <path
+              d="M108 214 C88 218, 76 205, 80 190 C66 180, 72 162, 90 165 C90 145, 126 145, 126 165 C144 161, 150 180, 138 190 C142 204, 130 218, 108 214 Z"
+              fill="url(#smokeGrad)"
+            />
+
+            <path
+              d="M86 156 C82 188, 134 188, 130 156 C128 132, 121 118, 108 116 C95 118, 88 132, 86 156 Z"
+              fill="url(#bodyGrad)"
+            />
+
+            <ellipse cx="110" cy="92" rx="44" ry="42" fill="#63B6FF" />
+            <ellipse cx="96" cy="78" rx="14" ry="10" fill="rgba(255,255,255,0.22)" />
+
+            {/* kulaklar yok */}
+
+            <g transform="translate(58 10)">
+              <ellipse cx="52" cy="38" rx="18" ry="28" fill="#fff" />
+              <ellipse cx="26" cy="50" rx="22" ry="18" fill="#fff" />
+              <ellipse cx="52" cy="46" rx="24" ry="20" fill="#fff" />
+              <ellipse cx="80" cy="50" rx="22" ry="18" fill="#fff" />
+              <ellipse cx="100" cy="40" rx="18" ry="16" fill="#fff" />
+              <rect x="20" y="54" width="64" height="14" rx="7" fill="#F3F4F6" stroke="rgba(0,0,0,0.08)" />
+            </g>
+
+            <path d="M73 54 Q110 30 147 54" stroke="#D97706" strokeWidth="14" strokeLinecap="round" fill="none" />
+            <circle cx="110" cy="46" r="13" fill="#F59E0B" />
+            <circle cx="110" cy="46" r="8" fill="#DC2626" />
+            <circle cx="106" cy="42" r="2.8" fill="#fff" />
+
+            <ellipse cx="93" cy="98" rx="15" ry="19" fill="#fff" />
+            <ellipse cx="126" cy="98" rx="15" ry="19" fill="#fff" />
+            <ellipse cx="95" cy="100" rx="9.5" ry="12.5" fill="#111827" className="genie-eye" />
+            <ellipse cx="124" cy="100" rx="9.5" ry="12.5" fill="#111827" className="genie-eye" />
+            <circle cx="98" cy="95" r="3.8" fill="#fff" />
+            <circle cx="127" cy="95" r="3.8" fill="#fff" />
+            <circle cx="94" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
+            <circle cx="123" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
+
+            {/* kırmızılık kaldırıldı */}
+
+            {isTalking ? (
+              <g className="genie-mouth-talk">
+                <ellipse cx="110" cy="126" rx="10" ry="8" fill="#7F1D1D" />
+                <path d="M102 123 Q110 132 118 123" fill="#FCA5A5" />
+              </g>
+            ) : (
+              <path d="M100 126 Q110 134 120 126" stroke="#111827" strokeWidth="3.2" strokeLinecap="round" fill="none" />
+            )}
+
+            {/* sol el tabak */}
+            <path
+              d="M74 132 C61 132, 48 122, 46 108"
+              stroke="#2F83FF"
+              strokeWidth="10"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx="45" cy="106" r="8" fill="#2F83FF" />
+            <ellipse cx="39" cy="102" rx="20" ry="15" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="2" />
+            <path d="M21 102 H57" stroke="#D1D5DB" strokeWidth="2" />
+
+            {/* sağ el kaşık */}
+            <g className={isTalking || isCooking ? "spoon-wave" : ""}>
+              <path
+                d="M146 132 C160 132, 171 124, 177 112"
+                stroke="#2F83FF"
+                strokeWidth="10"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <ellipse cx="183" cy="100" rx="9" ry="14" fill="#B45309" />
+              <rect x="177" y="112" width="6" height="24" rx="3" fill="#92400E" />
+            </g>
+
+            <path
+              d="M76 148 C86 140, 96 137, 110 137 C124 137, 134 140, 144 148"
+              stroke="#DC2626"
+              strokeWidth="8"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <circle cx="100" cy="149" r="4" fill="#DC2626" />
+            <circle cx="120" cy="149" r="4" fill="#DC2626" />
+          </g>
+
+          {/* daha küçük lamba */}
+          <g transform="translate(8,10)">
+            <path
+              d="M44 206 C54 190, 83 186, 108 192 C121 195, 126 202, 123 208 C119 215, 94 219, 69 217 C53 216, 42 212, 44 206 Z"
+              fill="url(#lampGrad)"
+              stroke="#A16207"
+              strokeWidth="2"
+            />
+            <path
+              d="M106 195 C116 192, 127 193, 134 199"
+              stroke="#A16207"
+              strokeWidth="5"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d="M52 204 C44 201, 39 195, 39 188"
+              stroke="#A16207"
+              strokeWidth="5"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </g>
+
+          <defs>
+            <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#8DDCFF" />
+              <stop offset="60%" stopColor="#4DA8FF" />
+              <stop offset="100%" stopColor="#2563EB" />
+            </linearGradient>
+            <linearGradient id="smokeGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#A5D8FF" />
+              <stop offset="100%" stopColor="#3B82F6" />
+            </linearGradient>
+            <linearGradient id="lampGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#FDE68A" />
+              <stop offset="60%" stopColor="#F59E0B" />
+              <stop offset="100%" stopColor="#B45309" />
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
     </div>
   );
 }
-
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
@@ -355,6 +522,7 @@ export default function FridgeChefApp() {
   const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
   const [cocktail, setCocktail] = useState<CocktailResponse | null>(null);
   const [alcoholLevel, setAlcoholLevel] = useState<AlcoholLevel>("orta");
+
   const [persons, setPersons] = useState(2);
 
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -373,6 +541,9 @@ export default function FridgeChefApp() {
   const idleTimerRef = useRef<any>(null);
 
   const canTTS = typeof window !== "undefined" && "speechSynthesis" in window;
+  const isMobile =
+    typeof window !== "undefined" &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const finalItems = useMemo(() => {
     const all = [...selectedNames, ...manualItems].map(normalize).filter(Boolean);
@@ -385,23 +556,16 @@ export default function FridgeChefApp() {
   }, [screen, recipe, cocktail]);
 
   const scaledIngredients = useMemo(() => {
-    return (recipe?.ingredients || []).map((i) => ({
-      ...i,
-      amount: Number((i.amount * persons).toFixed(2)),
-    }));
-  }, [recipe, persons]);
+    if (screen !== "recipe") return recipe?.ingredients || [];
+
+    return (recipe?.ingredients || []).map((item) =>
+      String(item).replace(/(\d+(\.\d+)?)/, (n) => String(Number(n) * persons))
+    );
+  }, [recipe, persons, screen]);
 
   const activeStepText = safeSteps[stepIndex] || safeSteps[0] || "";
   const activeStepBadge = getStepBadge(activeStepText, screen);
   const activeStepComment = getStepComment(activeStepText, screen);
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-    };
-  }, [imagePreviewUrl]);
 
   function ensureSynth() {
     if (typeof window === "undefined") return null;
@@ -668,19 +832,27 @@ export default function FridgeChefApp() {
     if (!file) {
       setImageFile(null);
       setImagePreviewUrl("");
+      if (fileRef.current) fileRef.current.value = "";
       resetIdleTimer();
       speak("Foto yok… önce onu halledelim 😄");
       return;
     }
 
-    if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-
     setImageFile(file);
 
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreviewUrl(previewUrl);
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      setImagePreviewUrl(result);
+    };
+
+    reader.onerror = () => {
+      setImagePreviewUrl("");
+      setError("Fotoğraf okunamadı");
+    };
+
+    reader.readAsDataURL(file);
 
     resetIdleTimer();
     speak("Foto geldi. Şimdi büyü zamanı 😎");
@@ -843,35 +1015,15 @@ export default function FridgeChefApp() {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
 
-      const safeIngredients = Array.isArray(data?.ingredients)
-        ? data.ingredients
-            .map((i: any) => ({
-              name: String(i?.name || "").trim(),
-              amount: Number(i?.amount || 0),
-              unit: String(i?.unit || "").trim(),
-            }))
-            .filter((i: any) => i.name && i.unit && !Number.isNaN(i.amount))
-        : [];
-
-      setRecipe({
-        title: String(data?.title || "Tarif"),
-        summary: String(data?.summary || ""),
-        ingredients: safeIngredients,
-        steps: Array.isArray(data?.steps) ? data.steps.map((x: any) => String(x)) : [],
-        calories: data?.calories ? String(data.calories) : "",
-        healthScore: typeof data?.healthScore === "number" ? data.healthScore : 0,
-        protein: data?.protein ? String(data.protein) : "",
-        carbs: data?.carbs ? String(data.carbs) : "",
-        fat: data?.fat ? String(data.fat) : "",
-        duration: data?.duration ? String(data.duration) : "",
-        difficulty: data?.difficulty ? String(data.difficulty) : "",
-      });
+      setRecipe(data);
+      setTtsMode("off");
+      setStepIndex(0);
 
       generateDishImage({
         mode: "recipe",
-        title: data.title || "Tarif",
-        summary: data.summary || "",
-        ingredients: safeIngredients.map((i: RecipeIngredient) => `${i.amount} ${i.unit} ${i.name}`),
+        title: data.title,
+        summary: data.summary,
+        ingredients: data.ingredients || [],
       });
 
       speak("Tarif hazır. Kalori ve sağlık puanını da çıkardım 😎");
@@ -1253,6 +1405,7 @@ export default function FridgeChefApp() {
         ref={fileRef}
         type="file"
         accept="image/*"
+        capture={isMobile ? "environment" : undefined}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0] ?? null;
@@ -1261,7 +1414,7 @@ export default function FridgeChefApp() {
       />
 
       <button
-        onClick={() => fileRef.current?.click()}
+       onClick={() => fileRef.current?.click()}
         className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
       >
         Kamera / Fotoğraf Aç
@@ -1391,21 +1544,11 @@ export default function FridgeChefApp() {
 
         <div className="mt-5 rounded-3xl bg-slate-50/80 p-4">
           <div className="text-sm font-black text-[#111827]">Malzemeler</div>
-          {screen === "recipe" ? (
-            <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
-              {scaledIngredients.map((i, x) => (
-                <li key={x}>
-                  {i.amount} {i.unit} {i.name}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
-              {(data.ingredients || []).map((x, i) => (
-                <li key={i}>{x}</li>
-              ))}
-            </ul>
-          )}
+          <ul className="mt-2 list-disc pl-5 text-sm font-semibold leading-6 text-slate-800">
+            {(screen === "recipe" ? scaledIngredients : data.ingredients || []).map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
+          </ul>
         </div>
 
         <div className="mt-4 rounded-3xl bg-white/70 p-4">
@@ -1452,10 +1595,7 @@ export default function FridgeChefApp() {
               mode: screen === "cocktail" ? "cocktail" : "recipe",
               title: d.title,
               summary: d.summary,
-              ingredients:
-                screen === "recipe"
-                  ? (recipe?.ingredients || []).map((i) => `${i.amount} ${i.unit} ${i.name}`)
-                  : (d.ingredients as string[]) || [],
+              ingredients: d.ingredients || [],
             });
           }}
           className="mt-4 w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-black text-[#111827]"
@@ -1477,6 +1617,9 @@ export default function FridgeChefApp() {
       </div>
     );
   }
+
+  const chefMode: "idle" | "scan" | "cook" | "talk" =
+    isScanning ? "scan" : isGenerating ? "cook" : isSpeaking ? "talk" : "idle";
 
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#ece8f1]">
@@ -1643,6 +1786,7 @@ export default function FridgeChefApp() {
 
       <div className="fixed bottom-3 right-3 z-50 sm:bottom-6 sm:right-4">
         <ChefCin
+          mode={chefMode}
           bubble={lastSpokenText}
           screen={screen}
           cinAction={cinAction}
