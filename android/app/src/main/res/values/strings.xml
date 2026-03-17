@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CinChef</string>
+    <string name="title_activity_main">CinChef</string>
+    <string name="package_name">com.cinchef.app</string>
+    <string name="custom_url_scheme">com.cinchef.app</string>
+</resources>

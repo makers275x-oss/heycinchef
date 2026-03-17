@@ -529,7 +529,6 @@ export default function FridgeChefApp() {
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceURI, setVoiceURI] = useState<string>("");
-const [voiceLoadDone, setVoiceLoadDone] = useState(false);
 
   const [ttsMode, setTtsMode] = useState<"off" | "steps">("off");
   const [stepIndex, setStepIndex] = useState(0);
@@ -627,46 +626,37 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
   }
 
   function speak(text: string, interrupt = true) {
-  const synth = ensureSynth();
-  const clean = stripEmojisForTTS(text);
+    const synth = ensureSynth();
+    if (!synth) {
+      setLastSpokenText(stripEmojisForTTS(text));
+      return;
+    }
+    if (interrupt) synth.cancel();
 
-  if (!clean.trim()) return;
+    const clean = stripEmojisForTTS(text);
+    if (!clean.trim()) return;
 
-  setLastSpokenText(clean);
+    setLastSpokenText(clean);
 
-  if (!synth) return;
+    const u = new SpeechSynthesisUtterance(clean);
+    const v = (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) || pickMaleVoice(voices);
+    if (v) u.voice = v;
 
-  if (interrupt) synth.cancel();
+    u.onend = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    };
+    u.onerror = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    };
 
-  const u = new SpeechSynthesisUtterance(clean);
-
-  const selectedVoice =
-    (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-    pickMaleVoice(voices) ||
-    null;
-
-  if (selectedVoice) {
-    u.voice = selectedVoice;
-    u.lang = selectedVoice.lang || "tr-TR";
-  } else {
-    u.lang = "tr-TR";
+    utterRef.current = u;
+    setIsSpeaking(true);
+    setIsPaused(false);
+    synth.speak(u);
   }
 
-  u.onend = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
-
-  u.onerror = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
-
-  utterRef.current = u;
-  setIsSpeaking(true);
-  setIsPaused(false);
-  synth.speak(u);
-}
   function pauseTTS() {
     const synth = ensureSynth();
     if (!synth) return;
@@ -683,59 +673,46 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
   }
 
   function speakStepAt(i: number) {
-  const steps = safeSteps;
+    const steps = safeSteps;
+    if (!steps.length) {
+      speak("Adım yok. Önce üretelim 😄");
+      return;
+    }
 
-  if (!steps.length) {
-    speak("Adım yok. Önce üretelim 😄");
-    return;
-  }
+    const idx = Math.max(0, Math.min(i, steps.length - 1));
+    setStepIndex(idx);
+    setTtsMode("steps");
 
-  const idx = Math.max(0, Math.min(i, steps.length - 1));
-  setStepIndex(idx);
-  setTtsMode("steps");
+    const synth = ensureSynth();
+    if (!synth) return;
+    synth.cancel();
 
-  const synth = ensureSynth();
-  if (!synth) return;
+    const text = `Adım ${idx + 1}. ${steps[idx]}`;
+    const u = new SpeechSynthesisUtterance(stripEmojisForTTS(text));
+    const v = (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) || pickMaleVoice(voices);
+    if (v) u.voice = v;
 
-  synth.cancel();
+    setLastSpokenText(stripEmojisForTTS(text));
 
-  const text = `Adım ${idx + 1}. ${steps[idx]}`;
-  const clean = stripEmojisForTTS(text);
-  const u = new SpeechSynthesisUtterance(clean);
+    u.onend = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+      const next = idx + 1;
+      if (next < steps.length) setTimeout(() => speakStepAt(next), 300);
+      else setTtsMode("off");
+    };
 
-  const selectedVoice =
-    (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-    pickMaleVoice(voices) ||
-    null;
+    u.onerror = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setTtsMode("off");
+    };
 
-  if (selectedVoice) {
-    u.voice = selectedVoice;
-    u.lang = selectedVoice.lang || "tr-TR";
-  } else {
-    u.lang = "tr-TR";
-  }
-
-  setLastSpokenText(clean);
-
-  u.onend = () => {
-    setIsSpeaking(false);
+    utterRef.current = u;
+    setIsSpeaking(true);
     setIsPaused(false);
-    const next = idx + 1;
-    if (next < steps.length) setTimeout(() => speakStepAt(next), 300);
-    else setTtsMode("off");
-  };
-
-  u.onerror = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-    setTtsMode("off");
-  };
-
-  utterRef.current = u;
-  setIsSpeaking(true);
-  setIsPaused(false);
-  synth.speak(u);
-}
+    synth.speak(u);
+  }
 
   function startPremium() {
     if (!safeSteps.length) {
@@ -747,65 +724,22 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
   }
 
   useEffect(() => {
-  const synth = ensureSynth();
-  if (!synth) {
-    setVoiceLoadDone(true);
-    return;
-  }
+    const synth = ensureSynth();
+    if (!synth) return;
 
-  let cancelled = false;
-  let tries = 0;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const loadVoices = () => {
-    if (cancelled) return;
-
-    const list = synth.getVoices() || [];
-
-    if (list.length > 0) {
+    const load = () => {
+      const list = synth.getVoices() || [];
       setVoices(list);
-      setVoiceLoadDone(true);
+    };
 
-      if (!voiceURI) {
-        const picked = pickMaleVoice(list);
-        if (picked) setVoiceURI(picked.voiceURI);
-      }
-      return;
-    }
+    load();
+    synth.onvoiceschanged = load;
 
-    tries += 1;
-
-    if (tries >= 8) {
-      setVoices([]);
-      setVoiceLoadDone(true);
-      return;
-    }
-
-    timer = setTimeout(loadVoices, 500);
-  };
-
-  loadVoices();
-
-  synth.onvoiceschanged = () => {
-    if (cancelled) return;
-
-    const list = synth.getVoices() || [];
-    setVoices(list);
-
-    if (list.length > 0 && !voiceURI) {
-      const picked = pickMaleVoice(list);
-      if (picked) setVoiceURI(picked.voiceURI);
-    }
-
-    setVoiceLoadDone(true);
-  };
-
-  return () => {
-    cancelled = true;
-    if (timer) clearTimeout(timer);
-    synth.onvoiceschanged = null;
-  };
-}, [voiceURI]);
+    return () => {
+      // @ts-ignore
+      synth.onvoiceschanged = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!voices.length) return;
@@ -1227,67 +1161,56 @@ function onPickFile(file: File | null) {
     </div>
   );
 
-  
-       const VoicePanel = () => {
-  const trVoices = voices.filter((v) => /tr|turkish/i.test(v.lang) || /turk/i.test(v.name));
-  const list = trVoices.length ? trVoices : voices;
+  const VoicePanel = () => {
+    const trVoices = voices.filter((v) => /tr|turkish/i.test(v.lang) || /turk/i.test(v.name));
+    const list = trVoices.length ? trVoices : voices;
 
-  return (
-    <div className={`mt-4 p-4 ${glassPanelSoft}`}>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-black text-[#111827]">Ses (Erkek)</div>
-        <button
-          onClick={() => {
-            resetIdleTimer();
-            speak("Ben hazırım 😄");
-          }}
-          className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
-        >
-          Konuş
-        </button>
-      </div>
+    return (
+      <div className={`mt-4 p-4 ${glassPanelSoft}`}>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-black text-[#111827]">Ses (Erkek)</div>
+          <button
+            onClick={() => {
+              resetIdleTimer();
+              speak("Ben hazırım 😄");
+            }}
+            className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
+          >
+            Konuş
+          </button>
+        </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2">
-        <select
-          value={voiceURI}
-          onChange={(e) => setVoiceURI(e.target.value)}
-          className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
-        >
-          {!voiceLoadDone ? (
-            <option value="">Ses yükleniyor…</option>
-          ) : voices.length === 0 ? (
-            <option value="">Varsayılan sistem sesi kullanılacak</option>
-          ) : (
-            list.map((v) => (
-              <option key={v.voiceURI} value={v.voiceURI}>
-                {v.name} - {v.lang}
-              </option>
-            ))
-          )}
-        </select>
-      </div>
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          <select
+            value={voiceURI}
+            onChange={(e) => setVoiceURI(e.target.value)}
+            className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
+          >
+            {voices.length === 0 ? (
+              <option value="">Ses yükleniyor…</option>
+            ) : (
+              list.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} - {v.lang}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
 
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={stopSpeaking}
-          className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-extrabold text-[#111827]"
-        >
-          Sus
-        </button>
-      </div>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={stopSpeaking}
+            className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-extrabold text-[#111827]"
+          >
+            Sus
+          </button>
+        </div>
 
-      <div className="mt-2 text-xs font-semibold text-slate-600">
-        {!canTTS
-          ? "Tarayıcı TTS desteklemiyor olabilir."
-          : !voiceLoadDone
-          ? "Sesler yükleniyor…"
-          : voices.length === 0
-          ? "Özel ses listesi alınamadı. Varsayılan sistem sesi kullanılabilir."
-          : ""}
+        {!canTTS && <div className="mt-2 text-xs font-semibold text-slate-600">Tarayıcı TTS desteklemiyor olabilir.</div>}
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const PremiumPanel = () => (
     <div className="mt-4 rounded-[24px] border border-amber-200/70 bg-gradient-to-br from-amber-50/95 to-white/95 p-4 shadow-sm">
