@@ -528,8 +528,9 @@ export default function FridgeChefApp() {
 
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voiceURI, setVoiceURI] = useState<string>("");
+const [voiceURI, setVoiceURI] = useState<string>("");
 const [voiceLoadDone, setVoiceLoadDone] = useState(false);
+const [ttsReady, setTtsReady] = useState(false);
 
   const [ttsMode, setTtsMode] = useState<"off" | "steps">("off");
   const [stepIndex, setStepIndex] = useState(0);
@@ -574,7 +575,26 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
     // @ts-ignore
     return window.speechSynthesis || null;
   }
+function unlockTTS() {
+  const synth = ensureSynth();
+  if (!synth) return false;
 
+  try {
+    synth.cancel();
+
+    const probe = new SpeechSynthesisUtterance(" ");
+    probe.volume = 0;
+    probe.rate = 1;
+    probe.pitch = 1;
+    probe.lang = "tr-TR";
+
+    synth.speak(probe);
+    setTtsReady(true);
+    return true;
+  } catch {
+    return false;
+  }
+}
   function pickMaleVoice(list: SpeechSynthesisVoice[]) {
     const tr = list.filter((v) => (v.lang || "").toLowerCase().startsWith("tr"));
     const pool = tr.length ? tr : list;
@@ -616,15 +636,19 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
   }
 
   function stopSpeaking() {
-    const synth = ensureSynth();
-    if (!synth) return;
-    synth.cancel();
-    setIsSpeaking(false);
-    setIsPaused(false);
-    setTtsMode("off");
-    setStepIndex(0);
-    utterRef.current = null;
+  const synth = ensureSynth();
+  if (synth) {
+    try {
+      synth.cancel();
+    } catch {}
   }
+
+  setIsSpeaking(false);
+  setIsPaused(false);
+  setTtsMode("off");
+  setStepIndex(0);
+  utterRef.current = null;
+}
 
   function speak(text: string, interrupt = true) {
   const synth = ensureSynth();
@@ -636,36 +660,60 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
 
   if (!synth) return;
 
-  if (interrupt) synth.cancel();
+  try {
+    if (interrupt) {
+      synth.cancel();
+    }
 
-  const u = new SpeechSynthesisUtterance(clean);
+    const doSpeak = () => {
+      const u = new SpeechSynthesisUtterance(clean);
 
-  const selectedVoice =
-    (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-    pickMaleVoice(voices) ||
-    null;
+      const selectedVoice =
+        (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
+        pickMaleVoice(voices) ||
+        null;
 
-  if (selectedVoice) {
-    u.voice = selectedVoice;
-    u.lang = selectedVoice.lang || "tr-TR";
-  } else {
-    u.lang = "tr-TR";
+      if (selectedVoice) {
+        u.voice = selectedVoice;
+        u.lang = selectedVoice.lang || "tr-TR";
+      } else {
+        u.lang = "tr-TR";
+      }
+
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+
+      u.onstart = () => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+        setTtsReady(true);
+      };
+
+      u.onend = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+      };
+
+      u.onerror = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+      };
+
+      utterRef.current = u;
+      synth.speak(u);
+    };
+
+    if (!ttsReady) {
+      unlockTTS();
+      setTimeout(doSpeak, 180);
+    } else {
+      setTimeout(doSpeak, interrupt ? 80 : 0);
+    }
+  } catch {
+    setIsSpeaking(false);
+    setIsPaused(false);
   }
-
-  u.onend = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
-
-  u.onerror = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
-
-  utterRef.current = u;
-  setIsSpeaking(true);
-  setIsPaused(false);
-  synth.speak(u);
 }
   function pauseTTS() {
     const synth = ensureSynth();
@@ -697,54 +745,84 @@ const [voiceLoadDone, setVoiceLoadDone] = useState(false);
   const synth = ensureSynth();
   if (!synth) return;
 
-  synth.cancel();
+  try {
+    synth.cancel();
 
-  const text = `Adım ${idx + 1}. ${steps[idx]}`;
-  const clean = stripEmojisForTTS(text);
-  const u = new SpeechSynthesisUtterance(clean);
+    const text = `Adım ${idx + 1}. ${steps[idx]}`;
+    const clean = stripEmojisForTTS(text);
 
-  const selectedVoice =
-    (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-    pickMaleVoice(voices) ||
-    null;
+    const doSpeak = () => {
+      const u = new SpeechSynthesisUtterance(clean);
 
-  if (selectedVoice) {
-    u.voice = selectedVoice;
-    u.lang = selectedVoice.lang || "tr-TR";
-  } else {
-    u.lang = "tr-TR";
-  }
+      const selectedVoice =
+        (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
+        pickMaleVoice(voices) ||
+        null;
 
-  setLastSpokenText(clean);
+      if (selectedVoice) {
+        u.voice = selectedVoice;
+        u.lang = selectedVoice.lang || "tr-TR";
+      } else {
+        u.lang = "tr-TR";
+      }
 
-  u.onend = () => {
-    setIsSpeaking(false);
-    setIsPaused(false);
-    const next = idx + 1;
-    if (next < steps.length) setTimeout(() => speakStepAt(next), 300);
-    else setTtsMode("off");
-  };
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
 
-  u.onerror = () => {
+      setLastSpokenText(clean);
+
+      u.onstart = () => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+        setTtsReady(true);
+      };
+
+      u.onend = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+        const next = idx + 1;
+        if (next < steps.length) {
+          setTimeout(() => speakStepAt(next), 350);
+        } else {
+          setTtsMode("off");
+        }
+      };
+
+      u.onerror = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setTtsMode("off");
+      };
+
+      utterRef.current = u;
+      synth.speak(u);
+    };
+
+    if (!ttsReady) {
+      unlockTTS();
+      setTimeout(doSpeak, 180);
+    } else {
+      setTimeout(doSpeak, 100);
+    }
+  } catch {
     setIsSpeaking(false);
     setIsPaused(false);
     setTtsMode("off");
-  };
-
-  utterRef.current = u;
-  setIsSpeaking(true);
-  setIsPaused(false);
-  synth.speak(u);
+  }
 }
 
-  function startPremium() {
-    if (!safeSteps.length) {
-      speak("Önce tarif ya da karışım üret 😄");
-      return;
-    }
-    speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
-    setTimeout(() => speakStepAt(0), 600);
+
+ function startPremium() {
+  if (!safeSteps.length) {
+    speak("Önce tarif ya da karışım üret 😄");
+    return;
   }
+
+  unlockTTS();
+  speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
+  setTimeout(() => speakStepAt(0), 700);
+}
 
   useEffect(() => {
   const synth = ensureSynth();
@@ -1237,10 +1315,7 @@ function onPickFile(file: File | null) {
       <div className="flex items-center justify-between">
         <div className="text-sm font-black text-[#111827]">Ses (Erkek)</div>
         <button
-          onClick={() => {
-            resetIdleTimer();
-            speak("Ben hazırım 😄");
-          }}
+          
           className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
         >
           Konuş
@@ -1282,7 +1357,7 @@ function onPickFile(file: File | null) {
           : !voiceLoadDone
           ? "Sesler yükleniyor…"
           : voices.length === 0
-          ? "Özel ses listesi alınamadı. Varsayılan sistem sesi kullanılabilir."
+          ? "Varsayılan sistem seni kullanılacak. İlk tıklamada kısa gecikme olabilir."
           : ""}
       </div>
     </div>
@@ -1867,10 +1942,13 @@ function onPickFile(file: File | null) {
           bubble={lastSpokenText}
           screen={screen}
           cinAction={cinAction}
-          onClick={() => {
-            resetIdleTimer();
-            speak("Hadi canım… foto ver de biraz şov yapalım 😎");
-          }}
+         onClick={() => {
+  resetIdleTimer();
+  unlockTTS();
+  setTimeout(() => {
+    speak("Hadi canım… foto ver de biraz şov yapalım 😎", true);
+  }, 120);
+}}
           onFast={actionFast}
           onFit={actionFit}
           onNew={actionNew}
