@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-
 import { Capacitor } from "@capacitor/core";
-import { TextToSpeech } from "@capacitor-community/text-to-speech";
 
 type Screen = "home" | "recipe" | "cocktail";
 type AlcoholLevel = "hafif" | "orta" | "sert";
@@ -38,6 +36,18 @@ type CocktailResponse = {
   drinkingStyle?: string;
 };
 
+type NativeTTSPlugin = {
+  speak: (options: {
+    text: string;
+    lang?: string;
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+    queueStrategy?: number;
+  }) => Promise<void>;
+  stop: () => Promise<void>;
+};
+
 function normalize(s: string) {
   return String(s || "").trim().toLowerCase();
 }
@@ -64,6 +74,7 @@ function aiLine(screen: Screen) {
       "Etiketi tara… oranı ben ayarlarım 😏",
     ],
   };
+
   const arr = map[screen];
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -129,6 +140,56 @@ const glassPanel =
 const glassPanelSoft =
   "rounded-[24px] border border-white/45 bg-white/84 backdrop-blur-md shadow-[0_8px_24px_rgba(15,23,42,0.10)]";
 
+const API_BASE = "https://heycinchef-7lqs.vercel.app";
+
+function apiUrl(path: string) {
+  return `${API_BASE}${path}`;
+}
+
+function mapApiError(err: unknown, fallback: string) {
+  const raw = err instanceof Error ? err.message : String(err || fallback);
+
+  if (/failed to fetch/i.test(raw)) {
+    return "API bağlantısı kurulamadı. Vercel API route tarafında CORS ayarı gerekiyor.";
+  }
+
+  if (!raw || raw === "Error") return fallback;
+  return raw;
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+async function postForm<T>(path: string, body: FormData): Promise<T> {
+  const res = await fetch(apiUrl(path), {
+    method: "POST",
+    mode: "cors",
+    cache: "no-store",
+    body,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 const ManualInput = React.memo(function ManualInput(props: {
   value: string;
   onChange: (v: string) => void;
@@ -155,13 +216,22 @@ const ManualInput = React.memo(function ManualInput(props: {
   );
 });
 
-const isNativeApp = () => Capacitor.isNativePlatform();
+const isNativeApp = () => typeof window !== "undefined" && Capacitor.isNativePlatform();
 
-const getTtsLang = (text?: string) => {
-  // Uygulama çoğunlukla Türkçe ise tr-TR, İngilizce içerik de varsa
-  // ileride daha akıllı detection ekleyebilirsin.
-  return "tr-TR";
-};
+const getTtsLang = (_text?: string) => "tr";
+
+async function importNativeTTS() {
+  if (typeof window === "undefined") return null;
+  if (!isNativeApp()) return null;
+
+  try {
+    const mod = await import("@capacitor-community/text-to-speech");
+    return mod;
+  } catch (err) {
+    console.warn("[TTS] plugin import hatası:", err);
+    return null;
+  }
+}
 
 const ManualPanel = React.memo(function ManualPanel(props: {
   placeholder: string;
@@ -222,6 +292,7 @@ const ManualPanel = React.memo(function ManualPanel(props: {
     </div>
   );
 });
+
 function ChefCin({
   mode,
   bubble,
@@ -272,37 +343,91 @@ function ChefCin({
     >
       <style jsx>{`
         @keyframes genieFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-8px);
+          }
         }
         @keyframes blink {
-          0%, 44%, 48%, 100% { transform: scaleY(1); }
-          46% { transform: scaleY(0.12); }
+          0%,
+          44%,
+          48%,
+          100% {
+            transform: scaleY(1);
+          }
+          46% {
+            transform: scaleY(0.12);
+          }
         }
         @keyframes talkMouth {
-          0%, 100% { transform: scaleY(1); }
-          50% { transform: scaleY(1.35); }
+          0%,
+          100% {
+            transform: scaleY(1);
+          }
+          50% {
+            transform: scaleY(1.35);
+          }
         }
         @keyframes spoonWave {
-          0%, 100% { transform: rotate(0deg); }
-          50% { transform: rotate(8deg); }
+          0%,
+          100% {
+            transform: rotate(0deg);
+          }
+          50% {
+            transform: rotate(8deg);
+          }
         }
         @keyframes steam {
-          0% { transform: translateY(8px); opacity: 0; }
-          30% { opacity: 0.45; }
-          100% { transform: translateY(-18px); opacity: 0; }
+          0% {
+            transform: translateY(8px);
+            opacity: 0;
+          }
+          30% {
+            opacity: 0.45;
+          }
+          100% {
+            transform: translateY(-18px);
+            opacity: 0;
+          }
         }
         @keyframes sparkle {
-          0%,100% { opacity: 0.35; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.12); }
+          0%,
+          100% {
+            opacity: 0.35;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.12);
+          }
         }
-        .genie-float { animation: genieFloat 3s ease-in-out infinite; }
-        .genie-eye { animation: blink 5s infinite; transform-origin: center; }
-        .genie-mouth-talk { animation: talkMouth 0.45s infinite ease-in-out; transform-origin: center; }
-        .spoon-wave { animation: spoonWave 1.2s ease-in-out infinite; transform-origin: 150px 128px; }
-        .steam-1 { animation: steam 1.8s ease-out infinite; }
-        .steam-2 { animation: steam 1.8s ease-out infinite 0.5s; }
-        .sparkle { animation: sparkle 1.6s ease-in-out infinite; }
+        .genie-float {
+          animation: genieFloat 3s ease-in-out infinite;
+        }
+        .genie-eye {
+          animation: blink 5s infinite;
+          transform-origin: center;
+        }
+        .genie-mouth-talk {
+          animation: talkMouth 0.45s infinite ease-in-out;
+          transform-origin: center;
+        }
+        .spoon-wave {
+          animation: spoonWave 1.2s ease-in-out infinite;
+          transform-origin: 150px 128px;
+        }
+        .steam-1 {
+          animation: steam 1.8s ease-out infinite;
+        }
+        .steam-2 {
+          animation: steam 1.8s ease-out infinite 0.5s;
+        }
+        .sparkle {
+          animation: sparkle 1.6s ease-in-out infinite;
+        }
       `}</style>
 
       <div className="pointer-events-auto mb-2 ml-auto w-[170px] sm:w-[300px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
@@ -371,9 +496,7 @@ function ChefCin({
             </>
           )}
 
-          {/* Cin */}
           <g>
-            {/* duman kuyruğu */}
             <path
               d="M108 214 C88 218, 76 205, 80 190 C66 180, 72 162, 90 165 C90 145, 126 145, 126 165 C144 161, 150 180, 138 190 C142 204, 130 218, 108 214 Z"
               fill="url(#smokeGrad)"
@@ -386,8 +509,6 @@ function ChefCin({
 
             <ellipse cx="110" cy="92" rx="44" ry="42" fill="#63B6FF" />
             <ellipse cx="96" cy="78" rx="14" ry="10" fill="rgba(255,255,255,0.22)" />
-
-            {/* kulaklar yok */}
 
             <g transform="translate(58 10)">
               <ellipse cx="52" cy="38" rx="18" ry="28" fill="#fff" />
@@ -412,8 +533,6 @@ function ChefCin({
             <circle cx="94" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
             <circle cx="123" cy="103" r="1.8" fill="rgba(255,255,255,0.45)" />
 
-            {/* kırmızılık kaldırıldı */}
-
             {isTalking ? (
               <g className="genie-mouth-talk">
                 <ellipse cx="110" cy="126" rx="10" ry="8" fill="#7F1D1D" />
@@ -423,7 +542,6 @@ function ChefCin({
               <path d="M100 126 Q110 134 120 126" stroke="#111827" strokeWidth="3.2" strokeLinecap="round" fill="none" />
             )}
 
-            {/* sol el tabak */}
             <path
               d="M74 132 C61 132, 48 122, 46 108"
               stroke="#2F83FF"
@@ -435,7 +553,6 @@ function ChefCin({
             <ellipse cx="39" cy="102" rx="20" ry="15" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="2" />
             <path d="M21 102 H57" stroke="#D1D5DB" strokeWidth="2" />
 
-            {/* sağ el kaşık */}
             <g className={isTalking || isCooking ? "spoon-wave" : ""}>
               <path
                 d="M146 132 C160 132, 171 124, 177 112"
@@ -459,7 +576,6 @@ function ChefCin({
             <circle cx="120" cy="149" r="4" fill="#DC2626" />
           </g>
 
-          {/* daha küçük lamba */}
           <g transform="translate(8,10)">
             <path
               d="M44 206 C54 190, 83 186, 108 192 C121 195, 126 202, 123 208 C119 215, 94 219, 69 217 C53 216, 42 212, 44 206 Z"
@@ -504,6 +620,7 @@ function ChefCin({
     </div>
   );
 }
+
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
@@ -514,7 +631,6 @@ export default function FridgeChefApp() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
-  const [fileInputKey, setFileInputKey] = useState(0);
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
@@ -539,28 +655,29 @@ export default function FridgeChefApp() {
 
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-const [voiceURI, setVoiceURI] = useState<string>("");
-const [voiceLoadDone, setVoiceLoadDone] = useState(false);
-const [ttsReady, setTtsReady] = useState(false);
+  const [voiceURI, setVoiceURI] = useState<string>("");
+  const [voiceLoadDone, setVoiceLoadDone] = useState(false);
+  const [ttsReady, setTtsReady] = useState(false);
 
   const [ttsMode, setTtsMode] = useState<"off" | "steps">("off");
   const [stepIndex, setStepIndex] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-const [nativeTtsEnabled, setNativeTtsEnabled] = useState(false);
-
+  const [nativeTtsEnabled, setNativeTtsEnabled] = useState(false);
 
   const [lastSpokenText, setLastSpokenText] = useState<string>("");
   const [cinAction, setCinAction] = useState<"fast" | "fit" | "new" | null>(null);
 
   const lastSpokenScreenRef = useRef<Screen | null>(null);
-  const idleTimerRef = useRef<any>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ttsModeRef = useRef<"off" | "steps">("off");
 
   const canTTS = typeof window !== "undefined" && "speechSynthesis" in window;
-  const isMobile =
-    typeof window !== "undefined" &&
-    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    ttsModeRef.current = ttsMode;
+  }, [ttsMode]);
 
   const finalItems = useMemo(() => {
     const all = [...selectedNames, ...manualItems].map(normalize).filter(Boolean);
@@ -586,34 +703,35 @@ const [nativeTtsEnabled, setNativeTtsEnabled] = useState(false);
 
   function ensureSynth() {
     if (typeof window === "undefined") return null;
-    // @ts-ignore
     return window.speechSynthesis || null;
   }
-function unlockTTS() {
-  if (nativeTtsEnabled && isNativeApp()) {
-    setTtsReady(true);
-    return true;
+
+  function unlockTTS() {
+    if (isNativeApp()) {
+      setTtsReady(true);
+      return true;
+    }
+
+    const synth = ensureSynth();
+    if (!synth) return false;
+
+    try {
+      synth.cancel();
+
+      const probe = new SpeechSynthesisUtterance(" ");
+      probe.volume = 0;
+      probe.rate = 1;
+      probe.pitch = 1;
+      probe.lang = "tr-TR";
+
+      synth.speak(probe);
+      setTtsReady(true);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  const synth = ensureSynth();
-  if (!synth) return false;
-
-  try {
-    synth.cancel();
-
-    const probe = new SpeechSynthesisUtterance(" ");
-    probe.volume = 0;
-    probe.rate = 1;
-    probe.pitch = 1;
-    probe.lang = "tr-TR";
-
-    synth.speak(probe);
-    setTtsReady(true);
-    return true;
-  } catch {
-    return false;
-  }
-}
   function pickMaleVoice(list: SpeechSynthesisVoice[]) {
     const tr = list.filter((v) => (v.lang || "").toLowerCase().startsWith("tr"));
     const pool = tr.length ? tr : list;
@@ -627,6 +745,16 @@ function unlockTTS() {
     );
   }
 
+  function openImagePicker() {
+    if (!fileRef.current) return;
+
+    try {
+      fileRef.current.value = "";
+    } catch {}
+
+    fileRef.current.click();
+  }
+
   async function generateDishImage(params: {
     mode: "recipe" | "cocktail";
     title: string;
@@ -637,15 +765,7 @@ function unlockTTS() {
       setIsImageGenerating(true);
       setDishImageUrl("");
 
-      const res = await fetch("/api/dish-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      const data = await res.json();
+      const data = await postJson<{ imageUrl?: string }>("/api/dish-image", params);
       setDishImageUrl(data?.imageUrl || "");
     } catch (err) {
       console.error("Görsel üretilemedi:", err);
@@ -654,415 +774,431 @@ function unlockTTS() {
     }
   }
 
-async function stopSpeaking() {
-  if (nativeTtsEnabled && isNativeApp()) {
+  async function speakNativeDirect(text: string, interrupt = true) {
+    const clean = stripEmojisForTTS(text).trim();
+    if (!clean) return;
+
+    const mod = await importNativeTTS();
+    const TTS = mod?.TextToSpeech as NativeTTSPlugin | undefined;
+
+    if (!TTS) {
+      throw new Error("Native TTS plugin yüklenemedi");
+    }
+
+    setLastSpokenText(clean);
+
     try {
-      await TextToSpeech.stop();
-    } catch (err) {
-      console.warn("Native TTS stop hatası:", err);
+      if (interrupt) {
+        await TTS.stop().catch(() => {});
+      }
+
+      setIsSpeaking(true);
+      setIsPaused(false);
+      setTtsReady(true);
+
+      try {
+        await TTS.speak({
+          text: clean,
+          lang: getTtsLang(clean),
+          rate: 1,
+          pitch: 1,
+          volume: 1,
+          queueStrategy: interrupt ? 0 : 1,
+        });
+      } catch (err1) {
+        console.warn("[TTS] dil ile konuşma başarısız, default deneniyor:", err1);
+
+        await TTS.speak({
+          text: clean,
+          rate: 1,
+          pitch: 1,
+          volume: 1,
+          queueStrategy: interrupt ? 0 : 1,
+        });
+      }
+    } finally {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    }
+  }
+
+  async function stopSpeaking() {
+    if (isNativeApp()) {
+      const mod = await importNativeTTS();
+      const TTS = mod?.TextToSpeech as NativeTTSPlugin | undefined;
+
+      if (TTS) {
+        try {
+          await TTS.stop();
+        } catch (err) {
+          console.warn("[TTS] Native stop hatası:", err);
+        }
+      }
+
+      setIsSpeaking(false);
+      setIsPaused(false);
+      ttsModeRef.current = "off";
+      setTtsMode("off");
+      setStepIndex(0);
+      utterRef.current = null;
+      return;
+    }
+
+    const synth = ensureSynth();
+    if (synth) {
+      try {
+        synth.cancel();
+      } catch {}
     }
 
     setIsSpeaking(false);
     setIsPaused(false);
+    ttsModeRef.current = "off";
     setTtsMode("off");
     setStepIndex(0);
     utterRef.current = null;
-    return;
   }
-
-  const synth = ensureSynth();
-  if (synth) {
-    try {
-      synth.cancel();
-    } catch {}
-  }
-
-  setIsSpeaking(false);
-  setIsPaused(false);
-  setTtsMode("off");
-  setStepIndex(0);
-  utterRef.current = null;
-}
 
   async function speak(text: string, interrupt = true) {
-  const clean = stripEmojisForTTS(text);
+    const clean = stripEmojisForTTS(text);
+    if (!clean.trim()) return;
 
-  if (!clean.trim()) return;
+    setLastSpokenText(clean);
 
-  setLastSpokenText(clean);
+    if (isNativeApp()) {
+      try {
+        await speakNativeDirect(clean, interrupt);
+        return;
+      } catch (err) {
+        console.warn("[TTS] Native konuşma başarısız, browser fallback deneniyor:", err);
+      }
+    }
 
-  if (nativeTtsEnabled && isNativeApp()) {
+    const synth = ensureSynth();
+    if (!synth) return;
+
     try {
       if (interrupt) {
-        await TextToSpeech.stop().catch(() => {});
+        synth.cancel();
       }
 
-      setIsSpeaking(true);
-      setIsPaused(false);
-      setTtsReady(true);
+      const doSpeak = () => {
+        const u = new SpeechSynthesisUtterance(clean);
 
-      await TextToSpeech.speak({
-        text: clean,
-        lang: getTtsLang(clean),
-        rate: 1.0,
-        pitch: 1.0,
-        volume: 1.0,
-        queueStrategy: interrupt ? 0 : 1,
-      });
+        const selectedVoice =
+          (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
+          pickMaleVoice(voices) ||
+          null;
 
-      setIsSpeaking(false);
-      setIsPaused(false);
-      return;
-    } catch (err) {
-      console.warn("Native TTS speak hatası:", err);
-      setIsSpeaking(false);
-      setIsPaused(false);
-      return;
-    }
-  }
+        if (selectedVoice) {
+          u.voice = selectedVoice;
+          u.lang = selectedVoice.lang || "tr-TR";
+        } else {
+          u.lang = "tr-TR";
+        }
 
-  const synth = ensureSynth();
-  if (!synth) return;
+        u.rate = 1;
+        u.pitch = 1;
+        u.volume = 1;
 
-  try {
-    if (interrupt) {
-      synth.cancel();
-    }
+        u.onstart = () => {
+          setIsSpeaking(true);
+          setIsPaused(false);
+          setTtsReady(true);
+        };
 
-    const doSpeak = () => {
-      const u = new SpeechSynthesisUtterance(clean);
+        u.onend = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        };
 
-      const selectedVoice =
-        (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-        pickMaleVoice(voices) ||
-        null;
+        u.onerror = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+        };
 
-      if (selectedVoice) {
-        u.voice = selectedVoice;
-        u.lang = selectedVoice.lang || "tr-TR";
+        utterRef.current = u;
+        synth.speak(u);
+      };
+
+      if (!ttsReady) {
+        unlockTTS();
+        setTimeout(doSpeak, 180);
       } else {
-        u.lang = "tr-TR";
+        setTimeout(doSpeak, interrupt ? 80 : 0);
+      }
+    } catch {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    }
+  }
+
+  async function pauseTTS() {
+    if (isNativeApp()) {
+      const mod = await importNativeTTS();
+      const TTS = mod?.TextToSpeech as NativeTTSPlugin | undefined;
+
+      if (TTS) {
+        try {
+          await TTS.stop();
+        } catch (err) {
+          console.warn("[TTS] Native pause/stop hatası:", err);
+        }
       }
 
-      u.rate = 1;
-      u.pitch = 1;
-      u.volume = 1;
-
-      u.onstart = () => {
-        setIsSpeaking(true);
-        setIsPaused(false);
-        setTtsReady(true);
-      };
-
-      u.onend = () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
-      };
-
-      u.onerror = () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
-      };
-
-      utterRef.current = u;
-      synth.speak(u);
-    };
-
-    if (!ttsReady) {
-      unlockTTS();
-      setTimeout(doSpeak, 180);
-    } else {
-      setTimeout(doSpeak, interrupt ? 80 : 0);
-    }
-  } catch {
-    setIsSpeaking(false);
-    setIsPaused(false);
-  }
-}
-async function pauseTTS() {
-  if (nativeTtsEnabled && isNativeApp()) {
-    // Plugin gerçek pause desteklemiyor, native'de stop gibi davranıyoruz
-    try {
-      await TextToSpeech.stop();
-    } catch (err) {
-      console.warn("Native TTS pause/stop hatası:", err);
-    }
-    setIsPaused(true);
-    setIsSpeaking(false);
-    return;
-  }
-
-  const synth = ensureSynth();
-  if (!synth) return;
-  if (!synth.speaking) return;
-  synth.pause();
-  setIsPaused(true);
-}
-
- async function resumeTTS() {
-  if (nativeTtsEnabled && isNativeApp()) {
-    setIsPaused(false);
-
-    if (ttsMode === "steps") {
-      await speakStepAt(stepIndex);
+      setIsPaused(true);
+      setIsSpeaking(false);
       return;
     }
 
-    if (lastSpokenText) {
-      await speak(lastSpokenText, true);
-    }
-
-    return;
+    const synth = ensureSynth();
+    if (!synth) return;
+    if (!synth.speaking) return;
+    synth.pause();
+    setIsPaused(true);
   }
 
-  const synth = ensureSynth();
-  if (!synth) return;
-  synth.resume();
-  setIsPaused(false);
-}
+  async function resumeTTS() {
+    if (isNativeApp()) {
+      setIsPaused(false);
+
+      if (ttsModeRef.current === "steps") {
+        await speakStepAt(stepIndex);
+        return;
+      }
+
+      if (lastSpokenText) {
+        await speak(lastSpokenText, true);
+      }
+      return;
+    }
+
+    const synth = ensureSynth();
+    if (!synth) return;
+    synth.resume();
+    setIsPaused(false);
+  }
 
   async function speakStepAt(i: number) {
-  const steps = safeSteps;
+    const steps = safeSteps;
 
-  if (!steps.length) {
-    await speak("Adım yok. Önce üretelim 😄");
-    return;
-  }
-
-  const idx = Math.max(0, Math.min(i, steps.length - 1));
-  setStepIndex(idx);
-  setTtsMode("steps");
-
-  const text = `Adım ${idx + 1}. ${steps[idx]}`;
-  const clean = stripEmojisForTTS(text);
-  setLastSpokenText(clean);
-
-  if (nativeTtsEnabled && isNativeApp()) {
-    try {
-      await TextToSpeech.stop().catch(() => {});
-      setIsSpeaking(true);
-      setIsPaused(false);
-      setTtsReady(true);
-
-      await TextToSpeech.speak({
-        text: clean,
-        lang: getTtsLang(clean),
-        rate: 1.0,
-        pitch: 1.0,
-        volume: 1.0,
-        queueStrategy: 0,
-      });
-
-      setIsSpeaking(false);
-      setIsPaused(false);
-
-      const next = idx + 1;
-      if (ttsMode === "steps" && next < steps.length) {
-        setTimeout(() => {
-          speakStepAt(next);
-        }, 350);
-      } else {
-        setTtsMode("off");
-      }
-
-      return;
-    } catch (err) {
-      console.warn("Native speakStepAt hatası:", err);
-      setIsSpeaking(false);
-      setIsPaused(false);
-      setTtsMode("off");
+    if (!steps.length) {
+      await speak("Adım yok. Önce üretelim 😄");
       return;
     }
-  }
 
-  const synth = ensureSynth();
-  if (!synth) return;
+    const idx = Math.max(0, Math.min(i, steps.length - 1));
+    setStepIndex(idx);
+    ttsModeRef.current = "steps";
+    setTtsMode("steps");
 
-  try {
-    synth.cancel();
+    const text = `Adım ${idx + 1}. ${steps[idx]}`;
+    const clean = stripEmojisForTTS(text);
+    setLastSpokenText(clean);
 
-    const doSpeak = () => {
-      const u = new SpeechSynthesisUtterance(clean);
+    if (isNativeApp()) {
+      try {
+        await speakNativeDirect(clean, true);
 
-      const selectedVoice =
-        (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
-        pickMaleVoice(voices) ||
-        null;
-
-      if (selectedVoice) {
-        u.voice = selectedVoice;
-        u.lang = selectedVoice.lang || "tr-TR";
-      } else {
-        u.lang = "tr-TR";
-      }
-
-      u.rate = 1;
-      u.pitch = 1;
-      u.volume = 1;
-
-      u.onstart = () => {
-        setIsSpeaking(true);
-        setIsPaused(false);
-        setTtsReady(true);
-      };
-
-      u.onend = () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
         const next = idx + 1;
-        if (next < steps.length) {
-          setTimeout(() => speakStepAt(next), 350);
-        } else {
+        if (ttsModeRef.current === "steps" && next < steps.length) {
+          setTimeout(() => {
+            void speakStepAt(next);
+          }, 350);
+        } else if (next >= steps.length) {
+          ttsModeRef.current = "off";
           setTtsMode("off");
         }
-      };
 
-      u.onerror = () => {
+        return;
+      } catch (err) {
+        console.warn("[TTS] Native speakStepAt hatası:", err);
         setIsSpeaking(false);
         setIsPaused(false);
+        ttsModeRef.current = "off";
         setTtsMode("off");
+        return;
+      }
+    }
+
+    const synth = ensureSynth();
+    if (!synth) return;
+
+    try {
+      synth.cancel();
+
+      const doSpeak = () => {
+        const u = new SpeechSynthesisUtterance(clean);
+
+        const selectedVoice =
+          (voiceURI ? voices.find((x) => x.voiceURI === voiceURI) : null) ||
+          pickMaleVoice(voices) ||
+          null;
+
+        if (selectedVoice) {
+          u.voice = selectedVoice;
+          u.lang = selectedVoice.lang || "tr-TR";
+        } else {
+          u.lang = "tr-TR";
+        }
+
+        u.rate = 1;
+        u.pitch = 1;
+        u.volume = 1;
+
+        u.onstart = () => {
+          setIsSpeaking(true);
+          setIsPaused(false);
+          setTtsReady(true);
+        };
+
+        u.onend = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          const next = idx + 1;
+          if (ttsModeRef.current === "steps" && next < steps.length) {
+            setTimeout(() => {
+              void speakStepAt(next);
+            }, 350);
+          } else {
+            ttsModeRef.current = "off";
+            setTtsMode("off");
+          }
+        };
+
+        u.onerror = () => {
+          setIsSpeaking(false);
+          setIsPaused(false);
+          ttsModeRef.current = "off";
+          setTtsMode("off");
+        };
+
+        utterRef.current = u;
+        synth.speak(u);
       };
 
-      utterRef.current = u;
-      synth.speak(u);
-    };
-
-    if (!ttsReady) {
-      unlockTTS();
-      setTimeout(doSpeak, 180);
-    } else {
-      setTimeout(doSpeak, 100);
+      if (!ttsReady) {
+        unlockTTS();
+        setTimeout(doSpeak, 180);
+      } else {
+        setTimeout(doSpeak, 100);
+      }
+    } catch {
+      setIsSpeaking(false);
+      setIsPaused(false);
+      ttsModeRef.current = "off";
+      setTtsMode("off");
     }
-  } catch {
-    setIsSpeaking(false);
-    setIsPaused(false);
-    setTtsMode("off");
-  }
-}
-
- async function startPremium() {
-  if (!safeSteps.length) {
-    await speak("Önce tarif ya da karışım üret 😄");
-    return;
   }
 
-  unlockTTS();
-  setTtsMode("steps");
-  await speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
-  setTimeout(() => speakStepAt(0), 700);
-}
-
-useEffect(() => {
-  let cancelled = false;
-
-  const initNativeTTS = async () => {
-    if (!isNativeApp()) {
-      setNativeTtsEnabled(false);
-      setTtsReady(true);
+  async function startPremium() {
+    if (!safeSteps.length) {
+      await speak("Önce tarif ya da karışım üret 😄");
       return;
     }
 
-    try {
-      setNativeTtsEnabled(true);
+    unlockTTS();
+    ttsModeRef.current = "steps";
+    setTtsMode("steps");
+    await speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
+    setTimeout(() => {
+      void speakStepAt(0);
+    }, 700);
+  }
 
-      const support = await TextToSpeech.isLanguageSupported({
-        lang: getTtsLang(),
-      });
+  useEffect(() => {
+    let mounted = true;
 
-      if (!support?.supported) {
-        try {
-          await TextToSpeech.openInstall();
-        } catch (err) {
-          console.warn("TTS openInstall başarısız:", err);
+    async function initTTS() {
+      if (!isNativeApp()) {
+        if (mounted) {
+          setNativeTtsEnabled(false);
+          setTtsReady(true);
         }
+        return;
       }
 
-      if (!cancelled) {
-        setTtsReady(true);
-      }
-    } catch (err) {
-      console.warn("Native TTS init hatası:", err);
+      const mod = await importNativeTTS();
 
-      if (!cancelled) {
-        setNativeTtsEnabled(false);
+      if (mounted) {
+        setNativeTtsEnabled(!!mod?.TextToSpeech);
         setTtsReady(true);
       }
     }
-  };
 
-  initNativeTTS();
+    void initTTS();
 
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-useEffect(() => {
-  if (nativeTtsEnabled && isNativeApp()) {
-    setVoiceLoadDone(true);
-    setVoices([]);
-    return;
-  }
-
-  const synth = ensureSynth();
-  if (!synth) {
-    setVoiceLoadDone(true);
-    return;
-  }
-
-  let cancelled = false;
-  let tries = 0;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const loadVoices = () => {
-    if (cancelled) return;
-
-    const list = synth.getVoices() || [];
-
-    if (list.length > 0) {
-      setVoices(list);
+  useEffect(() => {
+    if (isNativeApp()) {
       setVoiceLoadDone(true);
+      setVoices([]);
+      return;
+    }
 
-      if (!voiceURI) {
+    const synth = ensureSynth();
+    if (!synth) {
+      setVoiceLoadDone(true);
+      return;
+    }
+
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const loadVoices = () => {
+      if (cancelled) return;
+
+      const list = synth.getVoices() || [];
+
+      if (list.length > 0) {
+        setVoices(list);
+        setVoiceLoadDone(true);
+
+        if (!voiceURI) {
+          const picked = pickMaleVoice(list);
+          if (picked) setVoiceURI(picked.voiceURI);
+        }
+        return;
+      }
+
+      tries += 1;
+
+      if (tries >= 8) {
+        setVoices([]);
+        setVoiceLoadDone(true);
+        return;
+      }
+
+      timer = setTimeout(loadVoices, 500);
+    };
+
+    loadVoices();
+
+    synth.onvoiceschanged = () => {
+      if (cancelled) return;
+
+      const list = synth.getVoices() || [];
+      setVoices(list);
+
+      if (list.length > 0 && !voiceURI) {
         const picked = pickMaleVoice(list);
         if (picked) setVoiceURI(picked.voiceURI);
       }
-      return;
-    }
 
-    tries += 1;
-
-    if (tries >= 8) {
-      setVoices([]);
       setVoiceLoadDone(true);
-      return;
-    }
+    };
 
-    timer = setTimeout(loadVoices, 500);
-  };
-
-  loadVoices();
-
-  synth.onvoiceschanged = () => {
-    if (cancelled) return;
-
-    const list = synth.getVoices() || [];
-    setVoices(list);
-
-    if (list.length > 0 && !voiceURI) {
-      const picked = pickMaleVoice(list);
-      if (picked) setVoiceURI(picked.voiceURI);
-    }
-
-    setVoiceLoadDone(true);
-  };
-
-  return () => {
-    cancelled = true;
-    if (timer) clearTimeout(timer);
-    synth.onvoiceschanged = null;
-  };
-}, [voiceURI,nativeTtsEnabled]);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      synth.onvoiceschanged = null;
+    };
+  }, [voiceURI, nativeTtsEnabled]);
 
   useEffect(() => {
     if (!voices.length) return;
@@ -1071,13 +1207,13 @@ useEffect(() => {
   }, [voices]);
 
   useEffect(() => {
-  if (lastSpokenScreenRef.current === screen) return;
-  lastSpokenScreenRef.current = screen;
+    if (lastSpokenScreenRef.current === screen) return;
+    lastSpokenScreenRef.current = screen;
 
-  setTimeout(() => {
-    speak(aiLine(screen), true);
-  }, 450);
-}, [screen, voices.length, nativeTtsEnabled]);
+    setTimeout(() => {
+      void speak(aiLine(screen), true);
+    }, 450);
+  }, [screen, voices.length, nativeTtsEnabled]);
 
   function resetIdleTimer() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -1092,13 +1228,14 @@ useEffect(() => {
           ? ["Foto yükle, mutfakta şov yapalım 😄", "Dolap sessiz… ama ben değilim 😎", "Hadi şef, sıra sende 🧞"]
           : ["Bar hazır 😎", "Şişeleri göster, karışımı uçuralım 😏", "Bir barmenlik görelim 🧞"];
 
-      speak(idleLines[Math.floor(Math.random() * idleLines.length)], true);
+      void speak(idleLines[Math.floor(Math.random() * idleLines.length)], true);
     }, 12000);
   }
 
   useEffect(() => {
     const events: Array<keyof WindowEventMap> = ["mousemove", "click", "touchstart", "keydown", "scroll"];
     const handler = () => resetIdleTimer();
+
     events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
     resetIdleTimer();
 
@@ -1108,8 +1245,16 @@ useEffect(() => {
     };
   }, [screen, isScanning, isGenerating]);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
   function resetAll() {
-    stopSpeaking();
+    void stopSpeaking();
     setError("");
     setIsScanning(false);
     setScanDone(false);
@@ -1127,6 +1272,11 @@ useEffect(() => {
     setAlcoholLevel("orta");
     setPersons(2);
     setImageFile(null);
+
+    if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
     setImagePreviewUrl("");
     if (fileRef.current) fileRef.current.value = "";
     resetIdleTimer();
@@ -1137,43 +1287,34 @@ useEffect(() => {
     setScreen("home");
   }
 
-function onPickFile(file: File | null) {
-  setError("");
-  setRecipe(null);
-  setCocktail(null);
-  setDishImageUrl("");
-  stopSpeaking();
+  function onPickFile(file: File | null) {
+    if (!file) return;
 
-  setScanDone(false);
-  setVisionFood([]);
-  setVisionDrinks([]);
-  setSelectedNames([]);
-  setManualItems([]);
-  setManualInput("");
-  setTryIndex(0);
+    setError("");
+    setRecipe(null);
+    setCocktail(null);
+    setDishImageUrl("");
+    void stopSpeaking();
 
-  if (!file) {
-    setImageFile(null);
-    setImagePreviewUrl("");
+    setScanDone(false);
+    setVisionFood([]);
+    setVisionDrinks([]);
+    setSelectedNames([]);
+    setManualItems([]);
+    setManualInput("");
+    setTryIndex(0);
+
+    if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setImageFile(file);
+    setImagePreviewUrl(objectUrl);
+
     resetIdleTimer();
-    speak("Foto yok… önce onu halledelim 😄");
-    setFileInputKey((k) => k + 1);
-    return;
+    void speak("Foto geldi. Şimdi büyü zamanı 😎");
   }
-
-  if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
-    URL.revokeObjectURL(imagePreviewUrl);
-  }
-
-  setImageFile(file);
-  setImagePreviewUrl(URL.createObjectURL(file));
-  resetIdleTimer();
-  speak("Foto geldi. Şimdi büyü zamanı 😎");
-
-  setTimeout(() => {
-    setFileInputKey((k) => k + 1);
-  }, 0);
-}
 
   function toggleSelected(name: string) {
     const n = normalize(name);
@@ -1228,7 +1369,7 @@ function onPickFile(file: File | null) {
 
     setManualInput("");
     resetIdleTimer();
-    speak("Manual malzeme eklendi 😎");
+    void speak("Manual malzeme eklendi 😎");
   }
 
   function removeManual(it: string) {
@@ -1243,11 +1384,11 @@ function onPickFile(file: File | null) {
     setRecipe(null);
     setCocktail(null);
     setDishImageUrl("");
-    stopSpeaking();
+    await stopSpeaking();
 
     if (!imageFile) {
       setError("Önce fotoğraf seç 🧞");
-      speak("Foto yok… önce seçelim 😄");
+      await speak("Foto yok… önce seçelim 😄");
       return;
     }
 
@@ -1255,17 +1396,16 @@ function onPickFile(file: File | null) {
 
     setIsScanning(true);
     resetIdleTimer();
-    speak(type === "food" ? "Dolabı tarıyorum… içindekiler saklanmasın 👀" : "Etiketleri okuyorum… kaçamazlar 👀");
+    await speak(
+      type === "food" ? "Dolabı tarıyorum… içindekiler saklanmasın 👀" : "Etiketleri okuyorum… kaçamazlar 👀"
+    );
 
     try {
       const fd = new FormData();
       fd.append("image", imageFile);
       fd.append("type", type);
 
-      const res = await fetch("/api/vision", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-
+      const data = await postForm<{ items?: any[] }>("/api/vision", fd);
       const items = Array.isArray(data?.items) ? data.items : [];
 
       if (type === "food") {
@@ -1278,7 +1418,9 @@ function onPickFile(file: File | null) {
 
         setVisionFood(list);
         setSelectedNames(list.map((x) => x.name));
-        speak(list.length ? `Buldum: ${list.map((x) => x.name).join(", ")} 😎` : "Bir şey göremedim… daha net çek 😅");
+        await speak(
+          list.length ? `Buldum: ${list.map((x) => x.name).join(", ")} 😎` : "Bir şey göremedim… daha net çek 😅"
+        );
       } else {
         const list: VisionDrinkItem[] = items
           .map((x: any) => ({
@@ -1290,15 +1432,16 @@ function onPickFile(file: File | null) {
 
         setVisionDrinks(list);
         setSelectedNames(list.map((x) => normalize(x.name)));
-        speak(list.length ? "Etiketleri okudum. Bar açıldı 😎" : "Etiket okunmuyor… daha net çek ya da manuel ekle 😄");
+        await speak(list.length ? "Etiketleri okudum. Bar açıldı 😎" : "Etiket okunmuyor… daha net çek ya da manuel ekle 😄");
       }
 
       setScanDone(true);
       setTryIndex(0);
       resetIdleTimer();
-    } catch (e: any) {
-      setError(e?.message || "Tarama hatası");
-      speak("Tarama biraz dramatik bitti… bir daha deneyelim 😅");
+    } catch (e) {
+      const msg = mapApiError(e, "Tarama hatası");
+      setError(msg);
+      await speak("Tarama biraz dramatik bitti… bir daha deneyelim 😅");
     } finally {
       setIsScanning(false);
     }
@@ -1308,11 +1451,11 @@ function onPickFile(file: File | null) {
     setError("");
     setRecipe(null);
     setDishImageUrl("");
-    stopSpeaking();
+    await stopSpeaking();
 
     if (!finalItems.length) {
       setError("En az 1 ürün seç 🧞");
-      speak("Ürün seçmeden tarif çıkmaz 😄");
+      await speak("Ürün seçmeden tarif çıkmaz 😄");
       return;
     }
 
@@ -1320,33 +1463,32 @@ function onPickFile(file: File | null) {
 
     setIsGenerating(true);
     resetIdleTimer();
-    speak("Tarif yazıyorum… mutfakta olay var 😎");
+    await speak("Tarif yazıyorum… mutfakta olay var 😎");
 
     try {
-      const res = await fetch("/api/recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: finalItems, variation: v, persons }),
+      const data = await postJson<RecipeResponse>("/api/recipe", {
+        items: finalItems,
+        variation: v,
+        persons,
       });
 
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-
       setRecipe(data);
+      ttsModeRef.current = "off";
       setTtsMode("off");
       setStepIndex(0);
 
-      generateDishImage({
+      void generateDishImage({
         mode: "recipe",
         title: data.title,
         summary: data.summary,
         ingredients: data.ingredients || [],
       });
 
-      speak("Tarif hazır. Kalori ve sağlık puanını da çıkardım 😎");
-    } catch (e: any) {
-      setError(e?.message || "Tarif üretilemedi");
-      speak("Tarif çıkmadı… 😅");
+      await speak("Tarif hazır. Kalori ve sağlık puanını da çıkardım 😎");
+    } catch (e) {
+      const msg = mapApiError(e, "Tarif üretilemedi");
+      setError(msg);
+      await speak("Tarif çıkmadı… 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -1357,7 +1499,7 @@ function onPickFile(file: File | null) {
     setError("");
     setCocktail(null);
     setDishImageUrl("");
-    stopSpeaking();
+    await stopSpeaking();
 
     const selectedDrinkObjects = visionDrinks
       .filter((d) => selectedNames.includes(normalize(d.name)))
@@ -1373,7 +1515,7 @@ function onPickFile(file: File | null) {
 
     if (payloadItems.length < 2 || mixerCount === 0) {
       setError("Tek başına içkiyle karışım zor 🧞‍♂️ Manual ekle: buz + limon + soda/tonik/kola.");
-      speak("Karışım için biraz yardımcı lazım 😄");
+      await speak("Karışım için biraz yardımcı lazım 😄");
       return;
     }
 
@@ -1381,37 +1523,32 @@ function onPickFile(file: File | null) {
 
     setIsGenerating(true);
     resetIdleTimer();
-    speak("Karışımı ayarlıyorum… barmen modu 😎");
+    await speak("Karışımı ayarlıyorum… barmen modu 😎");
 
     try {
-      const res = await fetch("/api/cocktail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: payloadItems,
-          alcoholLevel,
-          variation: v,
-        }),
+      const data = await postJson<CocktailResponse>("/api/cocktail", {
+        items: payloadItems,
+        alcoholLevel,
+        variation: v,
       });
 
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-
       setCocktail(data);
+      ttsModeRef.current = "off";
       setTtsMode("off");
       setStepIndex(0);
 
-      generateDishImage({
+      void generateDishImage({
         mode: "cocktail",
         title: data.title,
         summary: data.summary,
         ingredients: data.ingredients || [],
       });
 
-      speak("Karışım hazır. Güç ve alkol oranını da hesapladım 😎");
-    } catch (e: any) {
-      setError(e?.message || "Kokteyl üretilemedi");
-      speak("Kokteyl çıkmadı… 😅");
+      await speak("Karışım hazır. Güç ve alkol oranını da hesapladım 😎");
+    } catch (e) {
+      const msg = mapApiError(e, "Kokteyl üretilemedi");
+      setError(msg);
+      await speak("Kokteyl çıkmadı… 😅");
     } finally {
       setIsGenerating(false);
       resetIdleTimer();
@@ -1422,15 +1559,15 @@ function onPickFile(file: File | null) {
     setCinAction("fast");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Pratik mod açıldı 😎" : "Hız modu açıldı 😎");
+    void speak(screen === "cocktail" ? "Pratik mod açıldı 😎" : "Hız modu açıldı 😎");
 
     const next = tryIndex + 11;
     setTryIndex(next);
     resetIdleTimer();
 
     setTimeout(() => {
-      if (screen === "recipe") generateRecipe(next);
-      else if (screen === "cocktail") generateCocktail(next);
+      if (screen === "recipe") void generateRecipe(next);
+      else if (screen === "cocktail") void generateCocktail(next);
     }, 350);
   }
 
@@ -1438,15 +1575,15 @@ function onPickFile(file: File | null) {
     setCinAction("fit");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak(screen === "cocktail" ? "Uzun içim modu 🧊" : "Fit mod açıldı 🥗");
+    void speak(screen === "cocktail" ? "Uzun içim modu 🧊" : "Fit mod açıldı 🥗");
 
     const next = tryIndex + 22;
     setTryIndex(next);
     resetIdleTimer();
 
     setTimeout(() => {
-      if (screen === "recipe") generateRecipe(next);
-      else if (screen === "cocktail") generateCocktail(next);
+      if (screen === "recipe") void generateRecipe(next);
+      else if (screen === "cocktail") void generateCocktail(next);
     }, 350);
   }
 
@@ -1454,15 +1591,15 @@ function onPickFile(file: File | null) {
     setCinAction("new");
     setTimeout(() => setCinAction(null), 1400);
 
-    speak("Yeni fikir geliyor 🎲");
+    void speak("Yeni fikir geliyor 🎲");
 
     const next = tryIndex + 1;
     setTryIndex(next);
     resetIdleTimer();
 
     setTimeout(() => {
-      if (screen === "recipe") generateRecipe(next);
-      else if (screen === "cocktail") generateCocktail(next);
+      if (screen === "recipe") void generateRecipe(next);
+      else if (screen === "cocktail") void generateCocktail(next);
     }, 350);
   }
 
@@ -1483,76 +1620,76 @@ function onPickFile(file: File | null) {
     </div>
   );
 
-  
-    const VoicePanel = () => {
-  const trVoices = voices.filter((v) => /tr|turkish/i.test(v.lang) || /turk/i.test(v.name));
-  const list = trVoices.length ? trVoices : voices;
-  const nativeMode = nativeTtsEnabled && isNativeApp();
+  const VoicePanel = () => {
+    const trVoices = voices.filter((v) => /tr|turkish/i.test(v.lang) || /turk/i.test(v.name));
+    const list = trVoices.length ? trVoices : voices;
+    const nativeMode = nativeTtsEnabled && isNativeApp();
 
-  return (
-    <div className={`mt-4 p-4 ${glassPanelSoft}`}>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-black text-[#111827]">
-          Ses {nativeMode ? "(Android Native)" : "(Erkek)"}
-        </div>
+    return (
+      <div className={`mt-4 p-4 ${glassPanelSoft}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-black text-[#111827]">Ses</div>
 
-        <button
-          onClick={() => {
-            resetIdleTimer();
-            unlockTTS();
-            speak("Cin Şef burada. Ses testi başarılı 😎", true);
-          }}
-          className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
-        >
-          Konuş
-        </button>
-      </div>
-
-      {!nativeMode && (
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          <select
-            value={voiceURI}
-            onChange={(e) => setVoiceURI(e.target.value)}
-            className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
+          <button
+            onClick={() => {
+              resetIdleTimer();
+              unlockTTS();
+              void speak("Cin Şef burada. Ses testi başarılı 😎", true);
+            }}
+            className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
           >
-            {!voiceLoadDone ? (
-              <option value="">Ses yükleniyor…</option>
-            ) : voices.length === 0 ? (
-              <option value="">Varsayılan sistem sesi kullanılacak</option>
-            ) : (
-              list.map((v) => (
-                <option key={v.voiceURI} value={v.voiceURI}>
-                  {v.name} - {v.lang}
-                </option>
-              ))
-            )}
-          </select>
+            Konuş
+          </button>
         </div>
-      )}
 
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={stopSpeaking}
-          className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-extrabold text-[#111827]"
-        >
-          Sus
-        </button>
-      </div>
+        {!nativeMode && (
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            <select
+              value={voiceURI}
+              onChange={(e) => setVoiceURI(e.target.value)}
+              className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
+            >
+              {!voiceLoadDone ? (
+                <option value="">Ses yükleniyor…</option>
+              ) : voices.length === 0 ? (
+                <option value="">Varsayılan sistem sesi kullanılacak</option>
+              ) : (
+                list.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} - {v.lang}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        )}
 
-      <div className="mt-2 text-xs font-semibold text-slate-600">
-        {nativeMode
-          ? "Android uygulamasında cihazın yerel TTS motoru kullanılıyor."
-          : !canTTS
-          ? "Tarayıcı TTS desteklemiyor olabilir."
-          : !voiceLoadDone
-          ? "Sesler yükleniyor…"
-          : voices.length === 0
-          ? "Varsayılan sistem sesi kullanılacak. İlk tıklamada kısa gecikme olabilir."
-          : "Tarayıcı sesi hazır."}
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => {
+              void stopSpeaking();
+            }}
+            className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-sm font-extrabold text-[#111827]"
+          >
+            Sus
+          </button>
+        </div>
+
+        {!nativeMode && (
+          <div className="mt-2 text-xs font-semibold text-slate-600">
+            {!canTTS
+              ? "Tarayıcı TTS desteklemiyor olabilir."
+              : !voiceLoadDone
+              ? "Sesler yükleniyor…"
+              : voices.length === 0
+              ? "Varsayılan sistem sesi kullanılacak. İlk tıklamada kısa gecikme olabilir."
+              : "Tarayıcı sesi hazır."}
+          </div>
+        )}
       </div>
-    </div>
-  );
-};
+    );
+  };
+
   const PremiumPanel = () => (
     <div className="mt-4 rounded-[24px] border border-amber-200/70 bg-gradient-to-br from-amber-50/95 to-white/95 p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -1566,25 +1703,38 @@ function onPickFile(file: File | null) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button onClick={startPremium} className="rounded-2xl bg-black px-3 py-3 text-sm font-black text-white">
+        <button
+          onClick={() => {
+            void startPremium();
+          }}
+          className="rounded-2xl bg-black px-3 py-3 text-sm font-black text-white"
+        >
           Başla
         </button>
+
         <button
-          onClick={stopSpeaking}
+          onClick={() => {
+            void stopSpeaking();
+          }}
           className="rounded-2xl border border-black/15 bg-white px-3 py-3 text-sm font-extrabold text-[#111827]"
         >
           Sus
         </button>
 
         <button
-          onClick={() => speakStepAt(stepIndex - 1)}
+          onClick={() => {
+            void speakStepAt(stepIndex - 1);
+          }}
           disabled={!safeSteps.length}
           className="rounded-2xl border border-black/15 bg-white px-3 py-3 text-sm font-extrabold text-[#111827] disabled:opacity-40"
         >
           ⟵ Geri
         </button>
+
         <button
-          onClick={() => speakStepAt(stepIndex + 1)}
+          onClick={() => {
+            void speakStepAt(stepIndex + 1);
+          }}
           disabled={!safeSteps.length}
           className="rounded-2xl border border-black/15 bg-white px-3 py-3 text-sm font-extrabold text-[#111827] disabled:opacity-40"
         >
@@ -1592,8 +1742,14 @@ function onPickFile(file: File | null) {
         </button>
 
         <button
-          onClick={() => (isPaused ? resumeTTS() : pauseTTS())}
-          disabled={!isSpeaking}
+          onClick={() => {
+            if (isPaused) {
+              void resumeTTS();
+            } else {
+              void pauseTTS();
+            }
+          }}
+          disabled={!isSpeaking && !isPaused}
           className="col-span-2 rounded-2xl border border-black/15 bg-white px-3 py-3 text-sm font-extrabold text-[#111827] disabled:opacity-40"
         >
           {isPaused ? "Devam" : "Duraklat"}
@@ -1709,7 +1865,7 @@ function onPickFile(file: File | null) {
             <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.drinkingStyle || "-"}</div>
           </div>
 
-          <div className="rounded-2xl bg-slate-50 p-3 col-span-2">
+          <div className="col-span-2 rounded-2xl bg-slate-50 p-3">
             <div className="text-xs font-bold text-slate-500">Tat Profili</div>
             <div className="mt-1 text-sm font-black text-[#111827]">{cocktail?.tasteProfile || "-"}</div>
           </div>
@@ -1738,31 +1894,28 @@ function onPickFile(file: File | null) {
       </div>
 
       <input
-  key={fileInputKey}
-  ref={fileRef}
-  type="file"
-  accept="image/*"
-  capture="environment"
-  className="hidden"
-  onChange={(e) => {
-    const file = e.currentTarget.files?.[0] ?? null;
-    onPickFile(file);
-  }}
-  onInput={(e) => {
-    const file = (e.currentTarget as HTMLInputElement).files?.[0] ?? null;
-    if (file && !imageFile) onPickFile(file);
-  }}
-/>
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0] ?? null;
+          onPickFile(file);
+        }}
+      />
 
       <button
-  onClick={() => fileRef.current?.click()}
-  className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
->
-  Kamera / Fotoğraf Aç
-</button>
+        onClick={openImagePicker}
+        className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+      >
+        Kamera / Fotoğraf Aç
+      </button>
 
       <button
-        onClick={scanImage}
+        onClick={() => {
+          void scanImage();
+        }}
         disabled={!imageFile || isScanning}
         className="mt-3 w-full rounded-2xl border border-black/15 bg-white/95 px-4 py-4 text-base font-black text-[#111827] shadow-sm disabled:opacity-40"
       >
@@ -1900,7 +2053,9 @@ function onPickFile(file: File | null) {
               return (
                 <li
                   key={i}
-                  className={"mt-2 rounded-xl px-2 py-2 transition " + (active ? "bg-black text-white shadow-sm" : "bg-transparent")}
+                  className={
+                    "mt-2 rounded-xl px-2 py-2 transition " + (active ? "bg-black text-white shadow-sm" : "bg-transparent")
+                  }
                 >
                   <span className="mr-2">{getStepBadge(x, screen)}</span>
                   {x}
@@ -1932,7 +2087,7 @@ function onPickFile(file: File | null) {
             const d = screen === "cocktail" ? cocktail : recipe;
             if (!d) return;
 
-            generateDishImage({
+            void generateDishImage({
               mode: screen === "cocktail" ? "cocktail" : "recipe",
               title: d.title,
               summary: d.summary,
@@ -1948,8 +2103,8 @@ function onPickFile(file: File | null) {
           onClick={() => {
             const next = tryIndex + 1;
             setTryIndex(next);
-            if (screen === "cocktail") generateCocktail(next);
-            else generateRecipe(next);
+            if (screen === "cocktail") void generateCocktail(next);
+            else void generateRecipe(next);
           }}
           className="mt-3 w-full rounded-2xl border border-black/15 bg-slate-100 px-4 py-3 text-sm font-black text-[#111827]"
         >
@@ -1976,7 +2131,9 @@ function onPickFile(file: File | null) {
             <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">AI Vision</div>
             <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">Türkçe Tarif</div>
             <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">Adım Adım Okuma</div>
-            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">AI Sunum Görseli</div>
+            <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#111827] shadow-sm">
+              AI Sunum Görseli
+            </div>
           </div>
         </div>
 
@@ -2036,11 +2193,13 @@ function onPickFile(file: File | null) {
                       onClick={() => {
                         resetIdleTimer();
                         setAlcoholLevel(lvl);
-                        speak(`Tamam. Güç seviyesi ${lvl} 😎`);
+                        void speak(`Tamam. Güç seviyesi ${lvl} 😎`);
                       }}
                       className={
                         "rounded-2xl px-3 py-2.5 text-sm font-black border transition " +
-                        (alcoholLevel === lvl ? "bg-black text-white border-black shadow-sm" : "bg-white text-[#111827] border-black/10")
+                        (alcoholLevel === lvl
+                          ? "bg-black text-white border-black shadow-sm"
+                          : "bg-white text-[#111827] border-black/10")
                       }
                     >
                       {lvl}
@@ -2099,8 +2258,8 @@ function onPickFile(file: File | null) {
                 <button
                   onClick={() => {
                     resetIdleTimer();
-                    if (screen === "recipe") generateRecipe();
-                    else generateCocktail();
+                    if (screen === "recipe") void generateRecipe();
+                    else void generateCocktail();
                   }}
                   disabled={isGenerating}
                   className="mt-5 w-full rounded-2xl bg-black px-4 py-4 text-lg font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)] disabled:opacity-40"
@@ -2131,13 +2290,13 @@ function onPickFile(file: File | null) {
           bubble={lastSpokenText}
           screen={screen}
           cinAction={cinAction}
-         onClick={async () => {
-  resetIdleTimer();
-  unlockTTS();
-  setTimeout(() => {
-    speak("Hadi canım… foto ver de biraz şov yapalım 😎", true);
-  }, 120);
-}}
+          onClick={() => {
+            resetIdleTimer();
+            unlockTTS();
+            setTimeout(() => {
+              void speak("Hadi canım… foto ver de biraz şov yapalım 😎", true);
+            }, 120);
+          }}
           onFast={actionFast}
           onFit={actionFit}
           onNew={actionNew}

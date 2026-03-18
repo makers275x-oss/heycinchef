@@ -5,6 +5,29 @@ export const dynamic = "force-dynamic";
 
 type AlcoholLevel = "hafif" | "orta" | "sert";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 function safeArr(v: any): string[] {
   if (!Array.isArray(v)) return [];
   return v.map((x) => String(x || "").trim()).filter(Boolean);
@@ -14,29 +37,21 @@ export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY yok" },
-        { status: 500 }
-      );
+      return jsonResponse({ error: "OPENAI_API_KEY yok" }, { status: 500 });
     }
 
     const body = await req.json().catch(() => ({}));
 
     const items: any[] = Array.isArray(body?.items) ? body.items : [];
     const alcoholLevel: AlcoholLevel =
-      body?.alcoholLevel === "hafif" ||
-      body?.alcoholLevel === "sert"
+      body?.alcoholLevel === "hafif" || body?.alcoholLevel === "sert"
         ? body.alcoholLevel
         : "orta";
 
-    const variation =
-      Number.isFinite(body?.variation) ? Number(body.variation) : 0;
+    const variation = Number.isFinite(body?.variation) ? Number(body.variation) : 0;
 
     if (!items.length) {
-      return NextResponse.json(
-        { error: "items boş" },
-        { status: 400 }
-      );
+      return jsonResponse({ error: "items boş" }, { status: 400 });
     }
 
     const itemText = items
@@ -155,10 +170,7 @@ KURALLAR:
 
     if (!resp.ok) {
       const t = await resp.text();
-      return NextResponse.json(
-        { error: "OpenAI cocktail hatası", detail: t },
-        { status: 500 }
-      );
+      return jsonResponse({ error: "OpenAI cocktail hatası", detail: t }, { status: 500 });
     }
 
     const json = await resp.json();
@@ -193,9 +205,7 @@ KURALLAR:
         ? (data.strength as AlcoholLevel)
         : alcoholLevel;
 
-    const score = Number.isFinite(data?.score)
-      ? Number(data.score)
-      : 70;
+    const score = Number.isFinite(data?.score) ? Number(data.score) : 70;
 
     const abv = String(data?.abv || "%12");
     const tasteProfile = String(data?.tasteProfile || "Dengeli");
@@ -205,9 +215,8 @@ KURALLAR:
     const steps = safeArr(data?.steps);
     const tips = safeArr(data?.tips);
 
-    // 🔥 BOŞ DÖNMEYİ ENGELLE
     if (ingredients.length < 2 || steps.length < 2) {
-      return NextResponse.json({
+      return jsonResponse({
         title: "Mixer lazım 🧞",
         summary:
           "Karışım için en az 1 içki + 1 mixer gerekir. Manual ekle: buz + limon + soda/tonik/kola.",
@@ -216,20 +225,13 @@ KURALLAR:
         abv: "%0-5",
         tasteProfile: "Eksik içerik",
         drinkingStyle: "Tamamlanmamış",
-        ingredients: [
-          "(Eksik) buz",
-          "(Eksik) limon/lime",
-          "(Eksik) soda/tonik/kola",
-        ],
-        steps: [
-          "Manual ekle bölümünden mixer ekle.",
-          "Sonra tekrar karışım oluştur.",
-        ],
+        ingredients: ["(Eksik) buz", "(Eksik) limon/lime", "(Eksik) soda/tonik/kola"],
+        steps: ["Manual ekle bölümünden mixer ekle.", "Sonra tekrar karışım oluştur."],
         tips: ["Model tahmin yapmaz, sadece gördüğünü kullanır."],
       });
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       title,
       summary,
       strength,
@@ -242,7 +244,7 @@ KURALLAR:
       tips,
     });
   } catch (e: any) {
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: "cocktail route crash",
         detail: String(e?.message || e),

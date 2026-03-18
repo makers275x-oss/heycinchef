@@ -5,18 +5,41 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      mode, // "recipe" | "cocktail"
+      mode,
       title,
       summary,
       ingredients = [],
     } = body || {};
 
     if (!title) {
-      return NextResponse.json({ error: "title gerekli" }, { status: 400 });
+      return jsonResponse({ error: "title gerekli" }, { status: 400 });
     }
 
     const isCocktail = mode === "cocktail";
@@ -62,14 +85,14 @@ Kurallar:
     const b64 = result.data?.[0]?.b64_json;
 
     if (!b64) {
-      return NextResponse.json({ error: "Görsel üretilemedi" }, { status: 500 });
+      return jsonResponse({ error: "Görsel üretilemedi" }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       imageUrl: `data:image/png;base64,${b64}`,
     });
   } catch (error: any) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: error?.message || "Beklenmeyen hata" },
       { status: 500 }
     );

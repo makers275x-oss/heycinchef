@@ -3,6 +3,29 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 function extractOutputText(respJson: any): string {
   if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
     return respJson.output_text.trim();
@@ -25,7 +48,7 @@ export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "OPENAI_API_KEY yok" }, { status: 500 });
+      return jsonResponse({ error: "OPENAI_API_KEY yok" }, { status: 500 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -33,7 +56,7 @@ export async function POST(req: Request) {
     const variation: number = Number.isFinite(body?.variation) ? Number(body.variation) : 0;
 
     if (items.length === 0) {
-      return NextResponse.json({ error: "items boş" }, { status: 400 });
+      return jsonResponse({ error: "items boş" }, { status: 400 });
     }
 
     const prompt = `
@@ -146,7 +169,7 @@ Kurallar:
     }));
 
     if (!resp.ok) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: "OpenAI recipe hatası", detail: raw?._raw || raw },
         { status: 500 }
       );
@@ -155,7 +178,7 @@ Kurallar:
     const outText = extractOutputText(raw);
 
     if (!outText) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: "Model boş çıktı döndü", detail: JSON.stringify(raw).slice(0, 2000) },
         { status: 500 }
       );
@@ -186,13 +209,13 @@ Kurallar:
     const difficulty = String(data?.difficulty || "-");
 
     if (!steps.length) {
-      return NextResponse.json(
+      return jsonResponse(
         { error: "Tarif boş döndü", detail: outText.slice(0, 800) },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         title,
         summary,
@@ -209,7 +232,7 @@ Kurallar:
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: "recipe route crash", detail: String(e?.message || e) },
       { status: 500 }
     );

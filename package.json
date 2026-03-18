@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:mobile": "node scripts/mobile-build.mjs",
+    "cap:sync": "npx cap sync android",
     "start": "next start",
     "lint": "eslint"
   },

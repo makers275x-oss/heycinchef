@@ -26,17 +26,42 @@ type DrinkCategory =
   | "unknown";
 
 type VisionItem = {
-  name: string; // etiketten okunan (marka/ürün) veya "etiket okunmuyor"
-  category?: DrinkCategory; // drinks için
+  name: string;
+  category?: DrinkCategory;
   confidence: number;
 };
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(data: unknown, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...corsHeaders,
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
 
 function toBase64(buffer: ArrayBuffer) {
   return Buffer.from(buffer).toString("base64");
 }
+
 function norm(s: string) {
   return String(s || "").trim();
 }
+
 function uniqMax8(items: VisionItem[]) {
   const m = new Map<string, VisionItem>();
   for (const it of items) {
@@ -55,7 +80,9 @@ async function readOutputText(json: any): Promise<string> {
     for (const o of out) {
       const content = o?.content;
       if (Array.isArray(content)) {
-        for (const c of content) if (typeof c?.text === "string") texts.push(c.text);
+        for (const c of content) {
+          if (typeof c?.text === "string") texts.push(c.text);
+        }
       }
     }
     if (texts.length) return texts.join("\n");
@@ -66,7 +93,9 @@ async function readOutputText(json: any): Promise<string> {
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "OPENAI_API_KEY yok" }, { status: 500 });
+    if (!apiKey) {
+      return jsonResponse({ error: "OPENAI_API_KEY yok" }, { status: 500 });
+    }
 
     const form = await req.formData();
     const file = form.get("image") as File | null;
@@ -75,18 +104,22 @@ export async function POST(req: Request) {
     const kind: Kind = kindRaw === "drinks" ? "drinks" : "food";
     const isDrinks = kind === "drinks";
 
-    if (!file) return NextResponse.json({ error: "image missing" }, { status: 400 });
+    if (!file) {
+      return jsonResponse({ error: "image missing" }, { status: 400 });
+    }
 
     const mime = file.type || "image/jpeg";
     const okMime = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(mime);
-    if (!okMime) return NextResponse.json({ error: `Unsupported mime: ${mime}` }, { status: 400 });
+
+    if (!okMime) {
+      return jsonResponse({ error: `Unsupported mime: ${mime}` }, { status: 400 });
+    }
 
     const bytes = await file.arrayBuffer();
     const b64 = toBase64(bytes);
     const dataUrl = `data:${mime};base64,${b64}`;
 
-    // Drinks: uydurma azaltmak için daha yüksek eşik
-    const CONF_THRESHOLD = isDrinks ? 0.60 : 0.45;
+    const CONF_THRESHOLD = isDrinks ? 0.6 : 0.45;
 
     const prompt = isDrinks
       ? `
@@ -202,13 +235,19 @@ confidence 0..1
 
     const resp = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
       const t = await resp.text();
-      return NextResponse.json({ error: "OpenAI vision hatası", detail: t }, { status: 500 });
+      return jsonResponse(
+        { error: "OpenAI vision hatası", detail: t },
+        { status: 500 }
+      );
     }
 
     const json = await resp.json();
@@ -223,6 +262,7 @@ confidence 0..1
     }
 
     const rawItems: any[] = Array.isArray(parsed?.items) ? parsed.items : [];
+
     const items: VisionItem[] = rawItems
       .map((x: any) => ({
         name: norm(x?.name),
@@ -233,11 +273,22 @@ confidence 0..1
 
     const filtered = uniqMax8(items.filter((x) => x.confidence >= CONF_THRESHOLD));
 
-    return NextResponse.json(
-      { kind, threshold: CONF_THRESHOLD, items: filtered, count: filtered.length },
+    return jsonResponse(
+      {
+        kind,
+        threshold: CONF_THRESHOLD,
+        items: filtered,
+        count: filtered.length,
+      },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json({ error: "vision route crash", detail: String(e?.message || e) }, { status: 500 });
+    return jsonResponse(
+      {
+        error: "vision route crash",
+        detail: String(e?.message || e),
+      },
+      { status: 500 }
+    );
   }
 }
