@@ -2,6 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { Capacitor } from "@capacitor/core";
+import { TextToSpeech } from "@capacitor-community/text-to-speech";
+
 type Screen = "home" | "recipe" | "cocktail";
 type AlcoholLevel = "hafif" | "orta" | "sert";
 
@@ -151,6 +154,14 @@ const ManualInput = React.memo(function ManualInput(props: {
     />
   );
 });
+
+const isNativeApp = () => Capacitor.isNativePlatform();
+
+const getTtsLang = (text?: string) => {
+  // Uygulama çoğunlukla Türkçe ise tr-TR, İngilizce içerik de varsa
+  // ileride daha akıllı detection ekleyebilirsin.
+  return "tr-TR";
+};
 
 const ManualPanel = React.memo(function ManualPanel(props: {
   placeholder: string;
@@ -537,6 +548,9 @@ const [ttsReady, setTtsReady] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
+const [nativeTtsEnabled, setNativeTtsEnabled] = useState(false);
+
+
   const [lastSpokenText, setLastSpokenText] = useState<string>("");
   const [cinAction, setCinAction] = useState<"fast" | "fit" | "new" | null>(null);
 
@@ -576,6 +590,11 @@ const [ttsReady, setTtsReady] = useState(false);
     return window.speechSynthesis || null;
   }
 function unlockTTS() {
+  if (nativeTtsEnabled && isNativeApp()) {
+    setTtsReady(true);
+    return true;
+  }
+
   const synth = ensureSynth();
   if (!synth) return false;
 
@@ -635,7 +654,22 @@ function unlockTTS() {
     }
   }
 
-  function stopSpeaking() {
+async function stopSpeaking() {
+  if (nativeTtsEnabled && isNativeApp()) {
+    try {
+      await TextToSpeech.stop();
+    } catch (err) {
+      console.warn("Native TTS stop hatası:", err);
+    }
+
+    setIsSpeaking(false);
+    setIsPaused(false);
+    setTtsMode("off");
+    setStepIndex(0);
+    utterRef.current = null;
+    return;
+  }
+
   const synth = ensureSynth();
   if (synth) {
     try {
@@ -650,14 +684,44 @@ function unlockTTS() {
   utterRef.current = null;
 }
 
-  function speak(text: string, interrupt = true) {
-  const synth = ensureSynth();
+  async function speak(text: string, interrupt = true) {
   const clean = stripEmojisForTTS(text);
 
   if (!clean.trim()) return;
 
   setLastSpokenText(clean);
 
+  if (nativeTtsEnabled && isNativeApp()) {
+    try {
+      if (interrupt) {
+        await TextToSpeech.stop().catch(() => {});
+      }
+
+      setIsSpeaking(true);
+      setIsPaused(false);
+      setTtsReady(true);
+
+      await TextToSpeech.speak({
+        text: clean,
+        lang: getTtsLang(clean),
+        rate: 1.0,
+        pitch: 1.0,
+        volume: 1.0,
+        queueStrategy: interrupt ? 0 : 1,
+      });
+
+      setIsSpeaking(false);
+      setIsPaused(false);
+      return;
+    } catch (err) {
+      console.warn("Native TTS speak hatası:", err);
+      setIsSpeaking(false);
+      setIsPaused(false);
+      return;
+    }
+  }
+
+  const synth = ensureSynth();
   if (!synth) return;
 
   try {
@@ -715,26 +779,53 @@ function unlockTTS() {
     setIsPaused(false);
   }
 }
-  function pauseTTS() {
-    const synth = ensureSynth();
-    if (!synth) return;
-    if (!synth.speaking) return;
-    synth.pause();
+async function pauseTTS() {
+  if (nativeTtsEnabled && isNativeApp()) {
+    // Plugin gerçek pause desteklemiyor, native'de stop gibi davranıyoruz
+    try {
+      await TextToSpeech.stop();
+    } catch (err) {
+      console.warn("Native TTS pause/stop hatası:", err);
+    }
     setIsPaused(true);
+    setIsSpeaking(false);
+    return;
   }
 
-  function resumeTTS() {
-    const synth = ensureSynth();
-    if (!synth) return;
-    synth.resume();
+  const synth = ensureSynth();
+  if (!synth) return;
+  if (!synth.speaking) return;
+  synth.pause();
+  setIsPaused(true);
+}
+
+ async function resumeTTS() {
+  if (nativeTtsEnabled && isNativeApp()) {
     setIsPaused(false);
+
+    if (ttsMode === "steps") {
+      await speakStepAt(stepIndex);
+      return;
+    }
+
+    if (lastSpokenText) {
+      await speak(lastSpokenText, true);
+    }
+
+    return;
   }
 
-  function speakStepAt(i: number) {
+  const synth = ensureSynth();
+  if (!synth) return;
+  synth.resume();
+  setIsPaused(false);
+}
+
+  async function speakStepAt(i: number) {
   const steps = safeSteps;
 
   if (!steps.length) {
-    speak("Adım yok. Önce üretelim 😄");
+    await speak("Adım yok. Önce üretelim 😄");
     return;
   }
 
@@ -742,14 +833,53 @@ function unlockTTS() {
   setStepIndex(idx);
   setTtsMode("steps");
 
+  const text = `Adım ${idx + 1}. ${steps[idx]}`;
+  const clean = stripEmojisForTTS(text);
+  setLastSpokenText(clean);
+
+  if (nativeTtsEnabled && isNativeApp()) {
+    try {
+      await TextToSpeech.stop().catch(() => {});
+      setIsSpeaking(true);
+      setIsPaused(false);
+      setTtsReady(true);
+
+      await TextToSpeech.speak({
+        text: clean,
+        lang: getTtsLang(clean),
+        rate: 1.0,
+        pitch: 1.0,
+        volume: 1.0,
+        queueStrategy: 0,
+      });
+
+      setIsSpeaking(false);
+      setIsPaused(false);
+
+      const next = idx + 1;
+      if (ttsMode === "steps" && next < steps.length) {
+        setTimeout(() => {
+          speakStepAt(next);
+        }, 350);
+      } else {
+        setTtsMode("off");
+      }
+
+      return;
+    } catch (err) {
+      console.warn("Native speakStepAt hatası:", err);
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setTtsMode("off");
+      return;
+    }
+  }
+
   const synth = ensureSynth();
   if (!synth) return;
 
   try {
     synth.cancel();
-
-    const text = `Adım ${idx + 1}. ${steps[idx]}`;
-    const clean = stripEmojisForTTS(text);
 
     const doSpeak = () => {
       const u = new SpeechSynthesisUtterance(clean);
@@ -769,8 +899,6 @@ function unlockTTS() {
       u.rate = 1;
       u.pitch = 1;
       u.volume = 1;
-
-      setLastSpokenText(clean);
 
       u.onstart = () => {
         setIsSpeaking(true);
@@ -812,19 +940,70 @@ function unlockTTS() {
   }
 }
 
-
- function startPremium() {
+ async function startPremium() {
   if (!safeSteps.length) {
-    speak("Önce tarif ya da karışım üret 😄");
+    await speak("Önce tarif ya da karışım üret 😄");
     return;
   }
 
   unlockTTS();
-  speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
+  setTtsMode("steps");
+  await speak("Cin Şef modu açıldı. Adım adım gidiyoruz 😎");
   setTimeout(() => speakStepAt(0), 700);
 }
 
-  useEffect(() => {
+useEffect(() => {
+  let cancelled = false;
+
+  const initNativeTTS = async () => {
+    if (!isNativeApp()) {
+      setNativeTtsEnabled(false);
+      setTtsReady(true);
+      return;
+    }
+
+    try {
+      setNativeTtsEnabled(true);
+
+      const support = await TextToSpeech.isLanguageSupported({
+        lang: getTtsLang(),
+      });
+
+      if (!support?.supported) {
+        try {
+          await TextToSpeech.openInstall();
+        } catch (err) {
+          console.warn("TTS openInstall başarısız:", err);
+        }
+      }
+
+      if (!cancelled) {
+        setTtsReady(true);
+      }
+    } catch (err) {
+      console.warn("Native TTS init hatası:", err);
+
+      if (!cancelled) {
+        setNativeTtsEnabled(false);
+        setTtsReady(true);
+      }
+    }
+  };
+
+  initNativeTTS();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+useEffect(() => {
+  if (nativeTtsEnabled && isNativeApp()) {
+    setVoiceLoadDone(true);
+    setVoices([]);
+    return;
+  }
+
   const synth = ensureSynth();
   if (!synth) {
     setVoiceLoadDone(true);
@@ -883,7 +1062,7 @@ function unlockTTS() {
     if (timer) clearTimeout(timer);
     synth.onvoiceschanged = null;
   };
-}, [voiceURI]);
+}, [voiceURI,nativeTtsEnabled]);
 
   useEffect(() => {
     if (!voices.length) return;
@@ -892,14 +1071,13 @@ function unlockTTS() {
   }, [voices]);
 
   useEffect(() => {
-    if (lastSpokenScreenRef.current === screen) return;
-    lastSpokenScreenRef.current = screen;
+  if (lastSpokenScreenRef.current === screen) return;
+  lastSpokenScreenRef.current = screen;
 
-    setTimeout(() => {
-      speak(aiLine(screen), true);
-    }, 450);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, voices.length]);
+  setTimeout(() => {
+    speak(aiLine(screen), true);
+  }, 450);
+}, [screen, voices.length, nativeTtsEnabled]);
 
   function resetIdleTimer() {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -1306,41 +1484,51 @@ function onPickFile(file: File | null) {
   );
 
   
-       const VoicePanel = () => {
+    const VoicePanel = () => {
   const trVoices = voices.filter((v) => /tr|turkish/i.test(v.lang) || /turk/i.test(v.name));
   const list = trVoices.length ? trVoices : voices;
+  const nativeMode = nativeTtsEnabled && isNativeApp();
 
   return (
     <div className={`mt-4 p-4 ${glassPanelSoft}`}>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-black text-[#111827]">Ses (Erkek)</div>
+        <div className="text-sm font-black text-[#111827]">
+          Ses {nativeMode ? "(Android Native)" : "(Erkek)"}
+        </div>
+
         <button
-          
+          onClick={() => {
+            resetIdleTimer();
+            unlockTTS();
+            speak("Cin Şef burada. Ses testi başarılı 😎", true);
+          }}
           className="rounded-2xl bg-black px-3 py-2 text-xs font-extrabold text-white"
         >
           Konuş
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2">
-        <select
-          value={voiceURI}
-          onChange={(e) => setVoiceURI(e.target.value)}
-          className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
-        >
-          {!voiceLoadDone ? (
-            <option value="">Ses yükleniyor…</option>
-          ) : voices.length === 0 ? (
-            <option value="">Varsayılan sistem sesi kullanılacak</option>
-          ) : (
-            list.map((v) => (
-              <option key={v.voiceURI} value={v.voiceURI}>
-                {v.name} - {v.lang}
-              </option>
-            ))
-          )}
-        </select>
-      </div>
+      {!nativeMode && (
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          <select
+            value={voiceURI}
+            onChange={(e) => setVoiceURI(e.target.value)}
+            className="w-full rounded-2xl border border-black/15 bg-white px-3 py-2 text-sm font-bold text-[#111827]"
+          >
+            {!voiceLoadDone ? (
+              <option value="">Ses yükleniyor…</option>
+            ) : voices.length === 0 ? (
+              <option value="">Varsayılan sistem sesi kullanılacak</option>
+            ) : (
+              list.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} - {v.lang}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      )}
 
       <div className="mt-3 flex gap-2">
         <button
@@ -1352,18 +1540,19 @@ function onPickFile(file: File | null) {
       </div>
 
       <div className="mt-2 text-xs font-semibold text-slate-600">
-        {!canTTS
+        {nativeMode
+          ? "Android uygulamasında cihazın yerel TTS motoru kullanılıyor."
+          : !canTTS
           ? "Tarayıcı TTS desteklemiyor olabilir."
           : !voiceLoadDone
           ? "Sesler yükleniyor…"
           : voices.length === 0
-          ? "Varsayılan sistem seni kullanılacak. İlk tıklamada kısa gecikme olabilir."
-          : ""}
+          ? "Varsayılan sistem sesi kullanılacak. İlk tıklamada kısa gecikme olabilir."
+          : "Tarayıcı sesi hazır."}
       </div>
     </div>
   );
 };
-
   const PremiumPanel = () => (
     <div className="mt-4 rounded-[24px] border border-amber-200/70 bg-gradient-to-br from-amber-50/95 to-white/95 p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -1942,7 +2131,7 @@ function onPickFile(file: File | null) {
           bubble={lastSpokenText}
           screen={screen}
           cinAction={cinAction}
-         onClick={() => {
+         onClick={async () => {
   resetIdleTimer();
   unlockTTS();
   setTimeout(() => {
