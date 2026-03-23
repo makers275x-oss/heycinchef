@@ -144,203 +144,81 @@ function GenieBackground() {
     </div>
   );
 }
-function IntroCurtain({
-  showChef,
-  opening,
-}: {
-  showChef: boolean;
-  opening: boolean;
-}) {
+
+function IntroCurtain({ showChef }: { showChef: boolean }) {
   return (
     <div className="fixed inset-0 z-[120] overflow-hidden">
       <style jsx>{`
-        @keyframes introGlow {
-          0%,
-          100% {
-            opacity: 0.45;
-            transform: scale(1);
+        @keyframes curtainLeft {
+          0% {
+            transform: translateX(0);
           }
-          50% {
-            opacity: 0.9;
-            transform: scale(1.04);
+          100% {
+            transform: translateX(-100%);
           }
         }
-
-        @keyframes sparkleFloat {
+        @keyframes curtainRight {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        @keyframes fadeUp {
           0% {
             opacity: 0;
-            transform: translateY(8px) scale(0.8);
-          }
-          30% {
-            opacity: 0.9;
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-26px) scale(1.18);
-          }
-        }
-
-        @keyframes tasselSwingLeft {
-          0%,
-          100% {
-            transform: rotate(0deg);
-          }
-          50% {
-            transform: rotate(-5deg);
-          }
-        }
-
-        @keyframes tasselSwingRight {
-          0%,
-          100% {
-            transform: rotate(0deg);
-          }
-          50% {
-            transform: rotate(5deg);
-          }
-        }
-
-        @keyframes welcomeFade {
-          0% {
-            opacity: 0;
-            transform: translateY(16px) scale(0.95);
+            transform: translateY(18px) scale(0.96);
           }
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
           }
         }
-
-        .intro-glow {
-          animation: introGlow 1.8s ease-in-out infinite;
+        .curtain-left {
+          animation: curtainLeft 1.2s ease-in-out forwards;
+          animation-delay: 1.1s;
         }
-
-        .sparkle-1 {
-          animation: sparkleFloat 1.8s ease-out infinite;
+        .curtain-right {
+          animation: curtainRight 1.2s ease-in-out forwards;
+          animation-delay: 1.1s;
         }
-        .sparkle-2 {
-          animation: sparkleFloat 1.8s ease-out infinite 0.35s;
-        }
-        .sparkle-3 {
-          animation: sparkleFloat 1.8s ease-out infinite 0.7s;
-        }
-
-        .tassel-left {
-          animation: tasselSwingLeft 2.4s ease-in-out infinite;
-          transform-origin: top center;
-        }
-
-        .tassel-right {
-          animation: tasselSwingRight 2.4s ease-in-out infinite;
-          transform-origin: top center;
-        }
-
-        .welcome-anim {
-          animation: welcomeFade 0.45s ease-out forwards;
+        .intro-fade {
+          animation: fadeUp 0.45s ease-out forwards;
         }
       `}</style>
 
-      <div className="absolute inset-0 bg-[#120a15]" />
-
-      <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_center,rgba(255,220,140,0.16),rgba(0,0,0,0)_42%)]" />
-      <div className="intro-glow absolute left-1/2 top-1/2 z-[1] h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,215,120,0.28),rgba(255,215,120,0.08),rgba(0,0,0,0))] blur-2xl" />
-
-      <div className="absolute left-0 top-0 z-[2] h-20 w-full bg-gradient-to-b from-[#fbbf24] via-[#d97706] to-[#7c2d12] shadow-[0_8px_30px_rgba(0,0,0,0.25)]" />
-      <div className="absolute left-0 top-[72px] z-[2] h-5 w-full bg-gradient-to-b from-[#f59e0b] to-[#92400e]" />
-
-      <div className="absolute inset-x-0 top-0 z-[2] mx-auto h-28 w-[92%] rounded-b-[40px] border-x border-b border-[#fcd34d]/40 bg-gradient-to-b from-[#7c2d12]/20 to-transparent" />
-
-      <div className="absolute left-5 top-4 z-[3] flex flex-col items-center">
-        <div className="h-10 w-10 rounded-full border border-[#fde68a]/50 bg-gradient-to-br from-[#fef3c7] to-[#d97706] shadow-[0_6px_18px_rgba(0,0,0,0.25)]" />
-        <div className="h-16 w-[4px] bg-gradient-to-b from-[#fde68a] to-[#d97706]" />
-        <div className="tassel-left relative">
-          <div className="h-10 w-10 rounded-full border border-[#fcd34d]/50 bg-gradient-to-br from-[#fbbf24] to-[#92400e] shadow-[0_8px_18px_rgba(0,0,0,0.25)]" />
-          <div className="absolute left-1/2 top-8 flex -translate-x-1/2 gap-[3px]">
-            <span className="h-9 w-[3px] rounded-full bg-[#fcd34d]" />
-            <span className="h-11 w-[3px] rounded-full bg-[#f59e0b]" />
-            <span className="h-9 w-[3px] rounded-full bg-[#fcd34d]" />
-            <span className="h-10 w-[3px] rounded-full bg-[#f59e0b]" />
-            <span className="h-8 w-[3px] rounded-full bg-[#fcd34d]" />
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute right-5 top-4 z-[3] flex flex-col items-center">
-        <div className="h-10 w-10 rounded-full border border-[#fde68a]/50 bg-gradient-to-br from-[#fef3c7] to-[#d97706] shadow-[0_6px_18px_rgba(0,0,0,0.25)]" />
-        <div className="h-16 w-[4px] bg-gradient-to-b from-[#fde68a] to-[#d97706]" />
-        <div className="tassel-right relative">
-          <div className="h-10 w-10 rounded-full border border-[#fcd34d]/50 bg-gradient-to-br from-[#fbbf24] to-[#92400e] shadow-[0_8px_18px_rgba(0,0,0,0.25)]" />
-          <div className="absolute left-1/2 top-8 flex -translate-x-1/2 gap-[3px]">
-            <span className="h-9 w-[3px] rounded-full bg-[#fcd34d]" />
-            <span className="h-11 w-[3px] rounded-full bg-[#f59e0b]" />
-            <span className="h-9 w-[3px] rounded-full bg-[#fcd34d]" />
-            <span className="h-10 w-[3px] rounded-full bg-[#f59e0b]" />
-            <span className="h-8 w-[3px] rounded-full bg-[#fcd34d]" />
-          </div>
-        </div>
-      </div>
-
-      <div
-        className={
-          "absolute left-1/2 top-0 z-[4] h-full w-[7px] -translate-x-1/2 bg-gradient-to-b from-[#fde68a] via-[#fbbf24] to-[#92400e] blur-[0.5px] transition-opacity duration-500 " +
-          (opening ? "opacity-0" : "opacity-100")
-        }
-      />
-      <div
-        className={
-          "absolute left-1/2 top-1/2 z-[4] h-[520px] w-[180px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,240,180,0.40),rgba(255,240,180,0.10),rgba(0,0,0,0))] blur-3xl transition-opacity duration-700 " +
-          (opening ? "opacity-0" : "opacity-100")
-        }
-      />
+      <div className="absolute inset-0 bg-[#1b1020]" />
 
       {showChef && (
-        <div
-          className={
-            "absolute inset-0 z-[20] flex items-center justify-center transition-all duration-700 " +
-            (opening ? "opacity-0 scale-95 -translate-y-2" : "opacity-100 scale-100 translate-y-0")
-          }
-        >
-          <div className="welcome-anim rounded-[34px] border border-white/20 bg-white/12 px-8 py-8 text-center text-white shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="absolute inset-0 flex items-center justify-center intro-fade">
+          <div className="rounded-[32px] border border-white/20 bg-white/10 px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-md">
             <div className="text-5xl">🪔</div>
-            <div className="mt-4 text-3xl font-black tracking-tight">Cin Şef</div>
+            <div className="mt-4 text-3xl font-black">Cin Şef</div>
             <div className="mt-3 text-base font-semibold text-white/90">Hoş geldiniz</div>
-            <div className="mt-2 text-sm font-medium text-white/75">Perde açılıyor, büyü başlıyor</div>
-
-            <div className="mt-5 flex justify-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#fde68a] sparkle-1" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#fbbf24] sparkle-2" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#fde68a] sparkle-3" />
-            </div>
+            <div className="mt-2 text-sm font-medium text-white/70">Tarif büyüsü şimdi başlıyor</div>
           </div>
         </div>
       )}
 
-      <div
-        className={
-          "absolute left-0 top-0 z-[10] h-full w-1/2 transition-transform duration-[1500ms] ease-in-out " +
-          (opening ? "-translate-x-full" : "translate-x-0")
-        }
-      >
-        <div className="relative h-full w-full bg-gradient-to-r from-[#5f0b0b] via-[#991b1b] to-[#b91c1c] shadow-[inset_-18px_0_34px_rgba(0,0,0,0.28)]">
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0)_18%,rgba(255,255,255,0.08)_38%,rgba(0,0,0,0.06)_58%,rgba(255,255,255,0.04)_78%,rgba(0,0,0,0.08))]" />
-          <div className="absolute inset-y-0 right-3 w-[2px] bg-[#fbbf24]/50" />
-        </div>
-      </div>
+      <div className="curtain-left absolute left-0 top-0 h-full w-1/2 bg-gradient-to-r from-[#7f1010] to-[#b91c1c] shadow-[inset_-10px_0_30px_rgba(0,0,0,0.25)]" />
+      <div className="curtain-right absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-[#7f1010] to-[#b91c1c] shadow-[inset_10px_0_30px_rgba(0,0,0,0.25)]" />
 
-      <div
-        className={
-          "absolute right-0 top-0 z-[10] h-full w-1/2 transition-transform duration-[1500ms] ease-in-out " +
-          (opening ? "translate-x-full" : "translate-x-0")
-        }
-      >
-        <div className="relative h-full w-full bg-gradient-to-l from-[#5f0b0b] via-[#991b1b] to-[#b91c1c] shadow-[inset_18px_0_34px_rgba(0,0,0,0.28)]">
-          <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(255,255,255,0.06),rgba(255,255,255,0)_18%,rgba(255,255,255,0.08)_38%,rgba(0,0,0,0.06)_58%,rgba(255,255,255,0.04)_78%,rgba(0,0,0,0.08))]" />
-          <div className="absolute inset-y-0 left-3 w-[2px] bg-[#fbbf24]/50" />
-        </div>
-      </div>
+      <div className="absolute left-1/2 top-0 h-full w-[6px] -translate-x-1/2 bg-[#fbbf24]/70 blur-[1px]" />
     </div>
   );
 }
+
+const glassPanel =
+  "rounded-[28px] border border-white/50 bg-white/88 backdrop-blur-md shadow-[0_10px_32px_rgba(15,23,42,0.12)]";
+const glassPanelSoft =
+  "rounded-[24px] border border-white/45 bg-white/84 backdrop-blur-md shadow-[0_8px_24px_rgba(15,23,42,0.10)]";
+
+const API_BASE =
+  typeof window !== "undefined" && Capacitor.isNativePlatform()
+    ? "https://heycinchef-7lqs.vercel.app"
+    : "";
+
 function apiUrl(path: string) {
   return API_BASE ? `${API_BASE}${path}` : path;
 }
@@ -885,7 +763,7 @@ function ChefCin({
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
 
-  const [homeTitle] = useState("🪔 Cin Şef");
+  const [homeTitle] = useState("🪔 Cin Şef 99");
   const [homeSubtitle] = useState("Tarif hiç bu kadar eğlenceli olmamıştı.");
   const [homeLine] = useState("Dolabı ya da şişeleri göster. Cin sana tarif büyüsü yapsın.");
   const [homeStarted, setHomeStarted] = useState(false);
