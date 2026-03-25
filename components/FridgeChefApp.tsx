@@ -66,6 +66,59 @@ function stripEmojisForTTS(text: string) {
   return String(text || "").replace(/[\p{Extended_Pictographic}\uFE0F]/gu, "");
 }
 
+const BLOCKED_WORDS = [
+  "amk",
+  "aq",
+  "amına",
+  "amina",
+  "amcık",
+  "amcuk",
+  "sik",
+  "siktir",
+  "sikerim",
+  "yarrak",
+  "yarak",
+  "orospu",
+  "oc",
+  "piç",
+  "pic",
+  "ibne",
+  "göt",
+  "got",
+  "ananı",
+  "ananin",
+  "anan",
+  "bok",
+  "boktan",
+  "salak",
+  "mal",
+];
+
+function escapeRegex(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsBlockedWord(text: string) {
+  const v = normalize(text)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!v) return false;
+
+  return BLOCKED_WORDS.some((w) => {
+    const escaped = escapeRegex(w);
+    return new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i").test(v);
+  });
+}
+
+function sanitizeItems(list: string[]) {
+  return list
+    .map((x) => normalize(x))
+    .filter(Boolean)
+    .filter((x) => !containsBlockedWord(x));
+}
+
 function aiLine(screen: Screen) {
   const map: Record<Screen, string[]> = {
     home: [
@@ -204,7 +257,6 @@ function IntroCurtain({ showChef }: { showChef: boolean }) {
       <div className="curtain-left absolute left-0 top-0 h-full w-1/2 bg-gradient-to-r from-[#7f1010] to-[#b91c1c] shadow-[inset_-10px_0_30px_rgba(0,0,0,0.25)]" />
       <div className="curtain-right absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-[#7f1010] to-[#b91c1c] shadow-[inset_10px_0_30px_rgba(0,0,0,0.25)]" />
 
-      <div className="absolute left-1/2 top-0 h-full w-[6px] -translate-x-1/2 bg-[#fbbf24]/70 blur-[1px]" />
     </div>
   );
 }
@@ -414,7 +466,7 @@ const ManualPanel = React.memo(function ManualPanel(props: {
       </div>
 
       {props.manualItems.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
           {props.manualItems.map((it) => (
             <button
               type="button"
@@ -460,7 +512,7 @@ function ChefCin({
   const hint = screen === "cocktail" ? "Karışım stili" : "Tarif stili";
 
   const btnBase =
-    "rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold shadow-sm active:scale-95";
+    "shrink-0 rounded-full text-[11px] px-3 py-1.5 border transition-all font-extrabold shadow-sm active:scale-95";
   const btnOn = "bg-black text-white border-black scale-[1.04]";
   const btnOff = "bg-white border-black/15 text-black hover:bg-slate-50";
 
@@ -559,7 +611,7 @@ function ChefCin({
         }
       `}</style>
 
-      <div className="pointer-events-auto mb-2 ml-auto w-[145px] sm:w-[280px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
+      <div className="pointer-events-auto mb-2 ml-auto w-[280px] sm:w-[360px] rounded-[20px] border border-white/55 bg-white/92 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm font-bold text-[#111827] shadow-[0_16px_38px_rgba(0,0,0,0.18)] backdrop-blur-md">
         <div className="truncate text-[12px] sm:text-sm">{bubble || "Hazırım 😄"}</div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -762,8 +814,9 @@ function ChefCin({
 
 export default function FridgeChefApp() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [bootReady, setBootReady] = useState(false);
 
-  const [homeTitle] = useState("🪔 Cin Şef 99");
+  const [homeTitle] = useState("🪔 Cin Şef");
   const [homeSubtitle] = useState("Tarif hiç bu kadar eğlenceli olmamıştı.");
   const [homeLine] = useState("Dolabı ya da şişeleri göster. Cin sana tarif büyüsü yapsın.");
   const [homeStarted, setHomeStarted] = useState(false);
@@ -825,6 +878,10 @@ export default function FridgeChefApp() {
   }, [ttsMode]);
 
   useEffect(() => {
+    setScreen("home");
+    setHomeStarted(false);
+    setBootReady(true);
+
     const t1 = setTimeout(() => {
       setShowChefWelcome(true);
     }, 900);
@@ -1865,10 +1922,20 @@ export default function FridgeChefApp() {
 
     if (!parts.length) return;
 
+    const safeParts = sanitizeItems(parts);
+
+    if (!safeParts.length) {
+      setError("Uygunsuz ifade içerdiği için eklenmedi.");
+      setManualInput("");
+      resetIdleTimer();
+      void speak("Bu ifade uygun değil, eklemedim.");
+      return;
+    }
+
     setManualItems((prev) => {
       const set = new Set(prev.map(normalize));
       const out = [...prev];
-      for (const p of parts) {
+      for (const p of safeParts) {
         if (out.length >= 12) break;
         if (!set.has(p)) {
           out.push(p);
@@ -1881,7 +1948,7 @@ export default function FridgeChefApp() {
     setSelectedNames((prev) => {
       const set = new Set(prev.map(normalize));
       const out = [...prev];
-      for (const p of parts) {
+      for (const p of safeParts) {
         if (!set.has(p)) {
           out.push(p);
           set.add(p);
@@ -1890,9 +1957,16 @@ export default function FridgeChefApp() {
       return out;
     });
 
+    if (safeParts.length !== parts.length) {
+      setError("Bazı kelimeler uygunsuz olduğu için eklenmedi.");
+      void speak("Bazı kelimeleri filtreledim.");
+    } else {
+      setError("");
+      void speak("Manual malzeme eklendi 😎");
+    }
+
     setManualInput("");
     resetIdleTimer();
-    void speak("Manual malzeme eklendi 😎");
   }
 
   function removeManual(it: string) {
@@ -1942,7 +2016,8 @@ export default function FridgeChefApp() {
             name: normalize(x?.name),
             confidence: Number(x?.confidence ?? 0),
           }))
-          .filter((x: any) => x.name);
+          .filter((x: any) => x.name)
+          .filter((x: any) => !containsBlockedWord(x.name));
 
         setVisionFood(list);
         setSelectedNames(list.map((x) => x.name));
@@ -1959,7 +2034,8 @@ export default function FridgeChefApp() {
             category: String(x?.category || "").trim(),
             confidence: Number(x?.confidence ?? 0),
           }))
-          .filter((x: any) => x.name);
+          .filter((x: any) => x.name)
+          .filter((x: any) => !containsBlockedWord(x.name) && !containsBlockedWord(x.category || ""));
 
         setVisionDrinks(list);
         setSelectedNames(list.map((x) => normalize(x.name)));
@@ -2670,6 +2746,27 @@ export default function FridgeChefApp() {
   const chefMode: "idle" | "scan" | "cook" | "talk" =
     isScanning ? "scan" : isGenerating ? "cook" : isSpeaking ? "talk" : "idle";
 
+  function openChoiceScreen() {
+    resetIdleTimer();
+    setScreen("home");
+    setHomeStarted(true);
+    lastSpokenScreenRef.current = null;
+    unlockTTS();
+    void speak("Büyü başlıyor 😎 Tarif mi, kokteyl mi?", true);
+  }
+
+  function goRecipeFromHome() {
+    resetAll();
+    setScreen("recipe");
+    setHomeStarted(true);
+  }
+
+  function goCocktailFromHome() {
+    resetAll();
+    setScreen("cocktail");
+    setHomeStarted(true);
+  }
+
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#ece8f1]">
       <style jsx global>{`
@@ -2685,11 +2782,12 @@ export default function FridgeChefApp() {
         }
       `}</style>
 
+
       <GenieBackground />
       {showIntro && <IntroCurtain showChef={showChefWelcome} />}
 
       <div className="relative z-10 mx-auto w-full max-w-md px-4 pt-6 pb-[260px] sm:pb-[220px]">
-        {screen === "home" && !homeStarted && (
+        {bootReady && screen === "home" && !homeStarted && (
           <>
             <div className="rounded-[34px] border border-amber-200/70 bg-[#fff8ee]/95 p-5 shadow-[0_18px_40px_rgba(245,158,11,0.18)] backdrop-blur-sm">
               <div className="text-[26px] font-black tracking-tight text-[#111827]">{homeTitle}</div>
@@ -2714,13 +2812,7 @@ export default function FridgeChefApp() {
               </div>
 
               <button
-                onClick={() => {
-                  resetIdleTimer();
-                  setHomeStarted(true);
-                  lastSpokenScreenRef.current = null;
-                  unlockTTS();
-                  void speak("Büyü başlıyor 😎 Tarif mi, kokteyl mi?", true);
-                }}
+                onClick={openChoiceScreen}
                 className="mt-4 w-full rounded-2xl bg-black px-4 py-4 text-base font-black text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
               >
                 Günün büyüsüne başla
@@ -2729,14 +2821,10 @@ export default function FridgeChefApp() {
           </>
         )}
 
-        {screen === "home" && homeStarted && (
+        {bootReady && screen === "home" && homeStarted && (
           <div className="grid gap-4 animate-[fadeIn_.25s_ease]">
             <button
-              onClick={() => {
-                resetAll();
-                setHomeStarted(true);
-                setScreen("recipe");
-              }}
+              onClick={goRecipeFromHome}
               className="w-full rounded-[28px] bg-black p-5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
             >
               <div className="text-[22px] font-black tracking-tight">🍳 Tarif</div>
@@ -2749,11 +2837,7 @@ export default function FridgeChefApp() {
             </button>
 
             <button
-              onClick={() => {
-                resetAll();
-                setHomeStarted(true);
-                setScreen("cocktail");
-              }}
+              onClick={goCocktailFromHome}
               className="w-full rounded-[28px] border border-white/40 bg-white/95 p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm"
             >
               <div className="text-[22px] font-black tracking-tight text-[#111827]">🍸 Kokteyl</div>

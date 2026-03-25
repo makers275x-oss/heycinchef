@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
-const isMobileExport = process.env.MOBILE_EXPORT === "1";
-
 const nextConfig: NextConfig = {
-  output: isMobileExport ? "export" : undefined,
   images: {
     unoptimized: true,
   },
@@ -12,18 +9,9 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         headers: [
-          {
-            key: "Access-Control-Allow-Origin",
-            value: "*",
-          },
-          {
-            key: "Access-Control-Allow-Methods",
-            value: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-          },
-          {
-            key: "Access-Control-Allow-Headers",
-            value: "Content-Type, Authorization",
-          },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, POST, PUT, PATCH, DELETE, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
         ],
       },
     ];
