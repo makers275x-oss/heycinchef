@@ -2956,10 +2956,21 @@ export default function FridgeChefApp() {
           </div>
         )}
 
+<div className="text-center text-[11px] text-white/60 mt-6 pb-6">
+  <a
+    href="/privacy"
+    target="_blank"
+    className="underline hover:text-white transition"
+  >
+    🔒 Gizlilik Politikası
+  </a>
+</div>
+
         <div className="mt-6 text-center text-xs font-bold text-slate-700">
           Cin Şef © — “Tarif hiç bu kadar eğlenceli olmamıştı.”
         </div>
       </div>
+
 
       {!showIntro && (
         <div className="fixed bottom-3 right-3 z-50 sm:bottom-6 sm:right-4">
